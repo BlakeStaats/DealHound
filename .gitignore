@@ -4,10 +4,4 @@ node_modules/
 .next/
 .vercel/
 .DS_Store
-.env*
-!.env.example
-node_modules/
-.next/
-.vercel/
-.DS_Store
 MONAD Hackathon Context Rules.md

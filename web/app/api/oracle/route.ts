@@ -1,7 +1,5 @@
 import { OracleError, allowedHosts, getConfig } from "@/lib/oracle";
 
-export const dynamic = "force-dynamic";
-
 export async function GET() {
   try {
     const { account, chainId, contract, contractIsPlaceholder } = getConfig();
