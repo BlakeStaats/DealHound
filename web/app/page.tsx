@@ -1,5 +1,5 @@
 "use client";
-
+import Image from "next/image";
 import { useState } from "react";
 import { CONTRACT_ADDRESS, explorerAddress } from "@/lib/contract";
 import { WalletProvider, useBounties } from "@/components/wallet";
@@ -19,7 +19,7 @@ function Market() {
     <div className={s.app}>
       <header className={s.topbar}>
         <div className={s.brand}>
-          <span className={s.logo}>⚡</span>
+          <Image src="/bloodhound-logo-256.png" alt="" width={44} height={44} priority />
           <div>
             <div className={s.brandName}>DealHound</div>
             <div className={s.brandSub}>deal bounty marketplace</div>
