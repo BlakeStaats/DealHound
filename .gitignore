@@ -1,13 +1,19 @@
+# Secrets
 .env*
 !.env.example
+
+# Foundry (contracts, repo root)
+out/
+cache/
+broadcast/
+
+# Node / Next.js (web/)
 node_modules/
 .next/
 .vercel/
+
+# OS / editor
 .DS_Store
-.env*
-!.env.example
-node_modules/
-.next/
-.vercel/
-.DS_Store
+
+# Misc
 MONAD Hackathon Context Rules.md
