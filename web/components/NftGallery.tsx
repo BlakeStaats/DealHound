@@ -23,7 +23,7 @@ export function NftGallery({ bounties }: { bounties: Bounty[] }) {
       </div>
 
       {filled.length === 0 ? (
-        <div className={s.empty}>No Deal Proofs yet — claim a bounty in the Buy tab to mint one.</div>
+        <div className={s.empty}>No Deal Proofs yet — claim a bounty in Hunt deals to mint one.</div>
       ) : (
         <>
           <div className={s.grid}>

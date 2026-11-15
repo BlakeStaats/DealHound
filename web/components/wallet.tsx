@@ -1,10 +1,8 @@
 "use client";
 
 import {
-  createPublicClient,
   createWalletClient,
   custom,
-  http,
   parseEther,
   type Address,
   type Hex,
@@ -12,13 +10,14 @@ import {
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import {
   Bounty,
-  BountyStatus,
   CONTRACT_ADDRESS,
   DEAL_BOUNTY_ABI,
+  createDealPublicClient,
   monadTestnet,
+  readAllBounties,
 } from "@/lib/contract";
 
-export const publicClient = createPublicClient({ chain: monadTestnet, transport: http() });
+export const publicClient = createDealPublicClient();
 
 type Eip1193 = { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> };
 
@@ -143,43 +142,7 @@ export function useWallet() {
 // ---------- on-chain reads ----------
 
 export async function readBounties(): Promise<Bounty[]> {
-  const count = (await publicClient.readContract({
-    address: CONTRACT_ADDRESS,
-    abi: DEAL_BOUNTY_ABI,
-    functionName: "nextId",
-  })) as bigint;
-
-  const ids = Array.from({ length: Number(count) }, (_, i) => BigInt(i));
-  const results = await Promise.all(
-    ids.map((id) =>
-      publicClient.readContract({
-        address: CONTRACT_ADDRESS,
-        abi: DEAL_BOUNTY_ABI,
-        functionName: "bounties",
-        args: [id],
-      }),
-    ),
-  );
-
-  return results.map((r, i) => {
-    const b = r as readonly [
-      Address, bigint, number, number, bigint, bigint, Address, bigint, bigint, string, string,
-    ];
-    return {
-      id: ids[i],
-      poster: b[0],
-      expiry: b[1],
-      sharePct: Number(b[2]),
-      status: b[3] as BountyStatus,
-      refPriceCents: b[4],
-      escrow: b[5],
-      finder: b[6],
-      foundPriceCents: b[7],
-      payout: b[8],
-      item: b[9],
-      url: b[10],
-    } satisfies Bounty;
-  });
+  return readAllBounties();
 }
 
 /** Hook that loads bounties from chain, with a manual refresh. */
