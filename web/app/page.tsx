@@ -21,7 +21,7 @@ function Market() {
         <div className={s.brand}>
           <span className={s.logo}>⚡</span>
           <div>
-            <div className={s.brandName}>MonadFLIP</div>
+            <div className={s.brandName}>DealHound</div>
             <div className={s.brandSub}>deal bounty marketplace</div>
           </div>
         </div>
