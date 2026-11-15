@@ -10,6 +10,7 @@ import {
   usd,
 } from "@/lib/contract";
 import { STORES } from "@/lib/stores";
+import { SECTORS, classifyCategory } from "@/lib/categories";
 import { useBounties, useWallet } from "./wallet";
 import { DiscountBadge, Quote, WalletButton, scrapeQuote, shortAddr } from "./ui";
 import { formatEther } from "viem";
@@ -17,10 +18,39 @@ import s from "@/app/market.module.css";
 
 export function BuySection({ bountiesHook }: { bountiesHook: ReturnType<typeof useBounties> }) {
   const { bounties, loading, error, refresh } = bountiesHook;
+  const [category, setCategory] = useState<string>("all");
+
   const open = bounties.filter((b) => b.status === BountyStatus.Open);
+  const shown = category === "all" ? open : open.filter((b) => classifyCategory(b.item).id === category);
+
+  // Only show sector chips that have at least one open bounty (plus always "All").
+  const counts = new Map<string, number>();
+  for (const b of open) {
+    const id = classifyCategory(b.item).id;
+    counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
 
   return (
     <section>
+      <nav className={s.catbar}>
+        <button
+          className={category === "all" ? s.catPillActive : s.catPill}
+          onClick={() => setCategory("all")}
+        >
+          🏆 All <span className={s.catCount}>{open.length}</span>
+        </button>
+        {SECTORS.map((sec) => (
+          <button
+            key={sec.id}
+            className={category === sec.id ? s.catPillActive : s.catPill}
+            onClick={() => setCategory(sec.id)}
+          >
+            {sec.icon} {sec.label}
+            {counts.get(sec.id) ? <span className={s.catCount}>{counts.get(sec.id)}</span> : null}
+          </button>
+        ))}
+      </nav>
+
       <div className={s.sectionHead}>
         <h2>Open bounties</h2>
         <button className={s.ghostBtn} onClick={() => void refresh()}>
@@ -35,9 +65,12 @@ export function BuySection({ bountiesHook }: { bountiesHook: ReturnType<typeof u
           No open bounties yet. Head to <strong>Post a bounty</strong> to create one.
         </div>
       )}
+      {!loading && open.length > 0 && shown.length === 0 && (
+        <div className={s.empty}>No open bounties in this category yet.</div>
+      )}
 
       <div className={s.grid}>
-        {open.map((b) => (
+        {shown.map((b) => (
           <OpenBountyCard key={b.id.toString()} bounty={b} onFilled={() => void refresh()} />
         ))}
       </div>
@@ -137,11 +170,18 @@ function OpenBountyCard({ bounty, onFilled }: { bounty: Bounty; onFilled: () => 
     );
   }
 
+  const cat = classifyCategory(bounty.item);
+
   return (
     <article className={s.card}>
+      <div className={s.cardTop}>
+        <span className={s.catChip}>
+          {cat.icon} {cat.label}
+        </span>
+        <span className={s.id}>#{bounty.id.toString()}</span>
+      </div>
       <div className={s.cardHead}>
         <h3>{bounty.item}</h3>
-        <span className={s.id}>#{bounty.id.toString()}</span>
       </div>
 
       <div className={s.meta}>
