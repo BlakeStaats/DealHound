@@ -138,6 +138,34 @@ npm run verify
 
 Expect `PASS`.
 
+## Demo runbook & current testnet state
+
+Contract `0x629751D83702E11FFbB84a44fE9990a5E36B4501` is **live with seeded demo data**
+(as of 2026-11-15; bounties expire ~2026-11-22):
+
+- **Open bounties — left open for the live/manual demo:**
+  - `#4` — AirPods Pro 2, reference **$249.00**, **20%** share, 0.1 MON escrow — *headline demo bounty*
+  - `#5` — AirPods Pro 2, reference **$279.00**, **25%** share, 0.1 MON escrow
+- **Filled Deal Proofs (NFTs `#0`–`#3`)** — already minted by a hunter-bot test run (all found at
+  DealDepot `$189`). They populate the **Deal Proofs** gallery + leaderboard so the demo isn't empty.
+
+### Run the manual demo
+1. `cd web && npm run dev`, open http://localhost:3000 (make sure the hunter bot is **not** running).
+2. **Buy** tab → bounty `#4` → **Quote** on **DealDepot** ($189) → verifies at `−24% vs MSRP` →
+   **Submit deal** (connect a wallet holding testnet MON) → NFT mints; finder earns ~20% of the $60 saved.
+3. **Deal Proofs** tab shows the new NFT and the updated leaderboard.
+
+### Run the hunter bot (auto-fills open bounties)
+```bash
+cd web
+# set HUNTER_PRIVATE_KEY (a SEPARATE, funded wallet) in .env.local
+npm run hunter   # polls /api/bounties, quotes demo stores, submits the best deal that beats the reference
+```
+The bot signs `submitDeal` with `HUNTER_PRIVATE_KEY` — keep it distinct from the poster wallet and
+funded with a little MON for gas. **Stop it (Ctrl-C) before a manual demo** so bounties stay open.
+
+> Demo keys (oracle + hunter) live only in `web/.env.local` (gitignored). Never commit them.
+
 ## Build & test (contracts)
 
 ```bash
