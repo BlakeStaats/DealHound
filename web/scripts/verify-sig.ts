@@ -1,6 +1,8 @@
 // Usage: npm run verify [-- <storeSlug>]   (BASE_URL defaults to http://localhost:3000)
 // Recomputes the hash locally (independently of the server code) and recovers the signer.
 import { encodePacked, isAddressEqual, keccak256, recoverMessageAddress, type Address, type Hex } from "viem";
+import { matchingDemoProducts } from "../lib/match";
+import { storePath } from "../lib/stores";
 
 const BASE = process.env.BASE_URL ?? "http://localhost:3000";
 const slug = process.argv[2] ?? "dealdepot";
@@ -14,8 +16,15 @@ async function main() {
   const cfg = await (await fetch(`${BASE}/api/oracle`)).json();
   console.log("GET /api/oracle →", cfg);
 
-  const bountyId = "42";
-  const url = `${BASE}/stores/${slug}`;
+  // The oracle only signs for real, open bounties whose item matches the page, so pick one.
+  const { bounties } = await (await fetch(`${BASE}/api/bounties`)).json();
+  const pick = (bounties as { id: string; item: string }[])
+    .map((b) => ({ b, product: matchingDemoProducts(b.item)[0] }))
+    .find((x) => x.product);
+  if (!pick) throw new Error("no open bounty matches a demo product; post one first");
+  const bountyId = pick.b.id;
+  const url = `${BASE}${storePath(slug, pick.product.id)}`;
+  console.log(`using bounty #${bountyId} "${pick.b.item}" → ${url}`);
   const res = await fetch(`${BASE}/api/quote`, {
     method: "POST",
     headers: { "content-type": "application/json" },

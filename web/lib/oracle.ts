@@ -1,6 +1,7 @@
 import "server-only";
 import { encodePacked, isAddress, keccak256, type Address, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
+import { DEAL_BOUNTY_ABI, createDealPublicClient } from "./contract";
 
 export class OracleError extends Error {
   constructor(
@@ -238,4 +239,71 @@ export function parseBountyId(v: unknown): bigint {
     throw new OracleError("bad_bounty_id", "bountyId exceeds uint256");
   }
   return id;
+}
+
+// ---------- product matching ----------
+
+function findProductName(node: unknown): string | null {
+  if (Array.isArray(node)) {
+    for (const n of node) {
+      const r = findProductName(n);
+      if (r) return r;
+    }
+    return null;
+  }
+  if (!node || typeof node !== "object") return null;
+  const obj = node as Record<string, unknown>;
+  if (isProduct(obj) && typeof obj.name === "string" && obj.name.trim()) return obj.name.trim();
+  for (const v of Object.values(obj)) {
+    if (v && typeof v === "object") {
+      const r = findProductName(v);
+      if (r) return r;
+    }
+  }
+  return null;
+}
+
+/** Product name from JSON-LD Product.name, then og:title, then <title>. */
+export function extractProductName(html: string): string | null {
+  const scriptRe =
+    /<script\b[^>]*type\s*=\s*["']?application\/ld\+json["']?[^>]*>([\s\S]*?)<\/script>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = scriptRe.exec(html))) {
+    try {
+      const r = findProductName(JSON.parse(m[1].trim()));
+      if (r) return r;
+    } catch {
+      // try next block
+    }
+  }
+  const og = (html.match(/<meta\b[^>]*>/gi) ?? [])
+    .map(parseAttrs)
+    .find((a) => a.property === "og:title" && a.content)?.content;
+  if (og) return og;
+  const title = /<title[^>]*>([^<]*)<\/title>/i.exec(html)?.[1]?.trim();
+  return title || null;
+}
+
+/** Reads the bounty from the contract the oracle signs for. Must exist, be open and unexpired. */
+export async function readOpenBounty(id: bigint, contract: Address) {
+  let b: readonly unknown[];
+  try {
+    b = (await createDealPublicClient().readContract({
+      address: contract,
+      abi: DEAL_BOUNTY_ABI,
+      functionName: "bounties",
+      args: [id],
+    })) as readonly unknown[];
+  } catch (e) {
+    throw new OracleError("rpc_failed", `could not read bounty from chain: ${(e as Error).message}`, 502);
+  }
+  const [poster, expiry, , status, refPriceCents, , , , , item] = b as [
+    Address, bigint, number, number, bigint, bigint, Address, bigint, bigint, string,
+  ];
+  if (/^0x0{40}$/i.test(poster)) throw new OracleError("bounty_not_found", `bounty ${id} does not exist`, 404);
+  if (Number(status) !== 0) throw new OracleError("bounty_not_open", `bounty ${id} is already filled or refunded`, 409);
+  if (expiry <= BigInt(Math.floor(Date.now() / 1000))) {
+    throw new OracleError("bounty_expired", `bounty ${id} has expired`, 409);
+  }
+  return { item, refPriceCents };
 }

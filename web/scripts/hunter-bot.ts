@@ -22,7 +22,8 @@ import {
   monadTestnet,
   type OpenBountyJson,
 } from "../lib/contract";
-import { STORES } from "../lib/stores";
+import { STORES, storePath } from "../lib/stores";
+import { matchingDemoProducts } from "../lib/match";
 
 const BASE = (process.env.HUNTER_BASE_URL ?? process.env.BASE_URL ?? "http://localhost:3000").replace(
   /\/$/,
@@ -100,8 +101,10 @@ async function main() {
         log(`new bounty #${b.id}`, { item: b.item, refPriceCents: b.refPriceCents, sharePct: b.sharePct });
 
         const candidates: Quote[] = [];
-        for (const store of STORES) {
-          const url = `${BASE}/stores/${store.slug}`;
+        const products = matchingDemoProducts(b.item);
+        if (products.length === 0) log(`  no demo store sells "${b.item}", skipping`);
+        for (const store of products.flatMap((p) => STORES.map((st) => ({ ...st, path: storePath(st.slug, p.id) })))) {
+          const url = `${BASE}${store.path}`;
           log(`  quote ${store.name}`, url);
           try {
             const q = await quote(b.id, url);

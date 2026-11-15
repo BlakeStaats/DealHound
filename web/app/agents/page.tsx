@@ -72,14 +72,20 @@ export default function AgentsPage() {
       <pre style={pre}>{`POST /api/quote
 Content-Type: application/json
 
-{ "bountyId": "0", "url": "https://your-app/stores/dealdepot" }
+{ "bountyId": "0", "url": "https://your-app/stores/dealdepot/airpods-pro-2" }
 
 → {
   "bountyId": "0",
-  "url": "https://your-app/stores/dealdepot",
+  "url": "https://your-app/stores/dealdepot/airpods-pro-2",
   "priceCents": 18900,
   "sig": "0x…"
 }`}</pre>
+      <p style={{ color: "#8b90a6", lineHeight: 1.6 }}>
+        The oracle reads the bounty from the contract and only signs if the page&apos;s product name
+        matches the bounty&apos;s item. Otherwise it returns <code>product_mismatch</code>. Filled,
+        expired or unknown bounties return <code>bounty_not_open</code>, <code>bounty_expired</code> or{" "}
+        <code>bounty_not_found</code>.
+      </p>
 
       <div style={warn}>
         <strong>Critical:</strong> the oracle signs the exact <code>url</code> string. On-chain{" "}
@@ -112,8 +118,8 @@ CONTRACT_ADDRESS=0x629751D83702E11FFbB84a44fE9990a5E36B4501
 
 cd web && npm run hunter`}</pre>
       <p style={{ color: "#8b90a6", lineHeight: 1.6 }}>
-        The bot polls <code>/api/bounties</code> every 3s, quotes all <code>/stores/*</code> demo
-        pages for each new open bounty, picks the lowest price below the reference, and submits
+        The bot polls <code>/api/bounties</code> every 3s, quotes the <code>/stores/*</code> demo
+        pages that sell each new open bounty&apos;s item, picks the lowest price below the reference, and submits
         with the hunter key.
       </p>
     </main>

@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "verify": "node --env-file=.env.local scripts/verify-sig.ts",
+    "verify": "tsx --env-file=.env.local scripts/verify-sig.ts",
     "hunter": "tsx --env-file=.env.local scripts/hunter-bot.ts"
   },
   "dependencies": {

@@ -9,7 +9,8 @@ import {
   finderEarnedUsd,
   usd,
 } from "@/lib/contract";
-import { STORES } from "@/lib/stores";
+import { STORES, storePath } from "@/lib/stores";
+import { matchingDemoProducts } from "@/lib/match";
 import { SECTORS, classifyCategory } from "@/lib/categories";
 import { useBounties, useWallet } from "./wallet";
 import { DiscountBadge, Quote, WalletButton, scrapeQuote, shortAddr } from "./ui";
@@ -99,9 +100,15 @@ function OpenBountyCard({ bounty, onFilled }: { bounty: Bounty; onFilled: () => 
     }
   }
 
-  async function scrapeDemo(slug: string) {
-    const url = `${window.location.origin}/stores/${slug}`;
-    await quoteUrl(url, (st) => setDemoStates((p) => ({ ...p, [slug]: st })));
+  // Only demo products that match this bounty's item (the oracle rejects mismatches anyway).
+  const demoProducts = matchingDemoProducts(bounty.item);
+  const demoRows = demoProducts.flatMap((product) =>
+    STORES.map((store) => ({ key: `${product.id}:${store.slug}`, store, product })),
+  );
+
+  async function scrapeDemo(key: string, path: string) {
+    const url = `${window.location.origin}${path}`;
+    await quoteUrl(url, (st) => setDemoStates((p) => ({ ...p, [key]: st })));
   }
 
   async function quoteCustom() {
@@ -215,12 +222,18 @@ function OpenBountyCard({ bounty, onFilled }: { bounty: Bounty; onFilled: () => 
 
       <div className={s.approved}>
         <div className={s.approvedLabel}>Try demo stores</div>
-        {STORES.map((store) => {
-          const st = demoStates[store.slug] ?? {};
+        {demoRows.length === 0 && (
+          <span className={s.muted}>No demo store sells this item. Paste a real product URL above.</span>
+        )}
+        {demoRows.map(({ key, store, product }) => {
+          const st = demoStates[key] ?? {};
           return (
-            <div key={store.slug} className={s.storeRow}>
+            <div key={key} className={s.storeRow}>
               <div className={s.storeInfo}>
-                <span className={s.storeName}>{store.name}</span>
+                <span className={s.storeName}>
+                  {store.name}
+                  {demoProducts.length > 1 ? ` · ${product.name}` : ""}
+                </span>
                 {!st.quote && !st.error && <span className={s.muted}>not checked</span>}
                 {st.quote && (
                   <span className={s.storeQuote}>
@@ -240,7 +253,7 @@ function OpenBountyCard({ bounty, onFilled }: { bounty: Bounty; onFilled: () => 
                 <button
                   className={s.ghostBtn}
                   disabled={st.loading}
-                  onClick={() => void scrapeDemo(store.slug)}
+                  onClick={() => void scrapeDemo(key, storePath(store.slug, product.id))}
                 >
                   {st.loading ? "Quoting…" : "Quote"}
                 </button>
