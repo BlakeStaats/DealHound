@@ -1,26 +1,73 @@
-import Link from "next/link";
-import { STORES } from "@/lib/stores";
+"use client";
 
-export default function Home() {
+import { useState } from "react";
+import { CONTRACT_ADDRESS, explorerAddress } from "@/lib/contract";
+import { WalletProvider, useBounties } from "@/components/wallet";
+import { WalletButton, shortAddr } from "@/components/ui";
+import { BuySection } from "@/components/BuySection";
+import { SellSection } from "@/components/SellSection";
+import { NftGallery } from "@/components/NftGallery";
+import s from "./market.module.css";
+
+type Tab = "buy" | "sell" | "nfts";
+
+function Market() {
+  const [tab, setTab] = useState<Tab>("buy");
+  const bountiesHook = useBounties();
+
   return (
-    <main style={{ padding: 24, maxWidth: 720, fontFamily: "system-ui, sans-serif" }}>
-      <h1>MonadFLIP</h1>
-      <p>Deal bounties on Monad Testnet. Frontend coming soon; the oracle is live.</p>
-      <h2>Demo stores</h2>
-      <ul>
-        {STORES.map((s) => (
-          <li key={s.slug}>
-            <Link href={`/stores/${s.slug}`}>{s.name}</Link> — ${s.price.toFixed(2)}
-          </li>
-        ))}
-      </ul>
-      <h2>Oracle</h2>
-      <ul>
-        <li>
-          <Link href="/api/oracle">GET /api/oracle</Link>
-        </li>
-        <li>POST /api/quote {"{ bountyId, url }"}</li>
-      </ul>
-    </main>
+    <div className={s.app}>
+      <header className={s.topbar}>
+        <div className={s.brand}>
+          <span className={s.logo}>⚡</span>
+          <div>
+            <div className={s.brandName}>MonadFLIP</div>
+            <div className={s.brandSub}>deal bounty marketplace</div>
+          </div>
+        </div>
+        <WalletButton />
+      </header>
+
+      <nav className={s.tabs}>
+        <button className={tab === "buy" ? s.tabActive : s.tab} onClick={() => setTab("buy")}>
+          Buy · find deals
+        </button>
+        <button className={tab === "sell" ? s.tabActive : s.tab} onClick={() => setTab("sell")}>
+          Sell · post bounty
+        </button>
+        <button className={tab === "nfts" ? s.tabActive : s.tab} onClick={() => setTab("nfts")}>
+          Deal Proofs
+        </button>
+      </nav>
+
+      <main className={s.main}>
+        {tab === "buy" && <BuySection bountiesHook={bountiesHook} />}
+        {tab === "sell" && (
+          <SellSection
+            onPosted={() => {
+              bountiesHook.refresh();
+              setTab("buy");
+            }}
+          />
+        )}
+        {tab === "nfts" && <NftGallery bounties={bountiesHook.bounties} />}
+      </main>
+
+      <footer className={s.footer}>
+        Contract{" "}
+        <a href={explorerAddress(CONTRACT_ADDRESS)} target="_blank" rel="noreferrer">
+          {shortAddr(CONTRACT_ADDRESS)}
+        </a>{" "}
+        · Monad Testnet (10143)
+      </footer>
+    </div>
+  );
+}
+
+export default function Page() {
+  return (
+    <WalletProvider>
+      <Market />
+    </WalletProvider>
   );
 }
