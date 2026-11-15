@@ -8,12 +8,14 @@ export function generateStaticParams() {
   return STORES.map((st) => ({ slug: st.slug }));
 }
 
-export async function generateMetadata({ params }: PageProps<"/stores/[slug]">): Promise<Metadata> {
+type StoreParams = { params: Promise<{ slug: string }> };
+
+export async function generateMetadata({ params }: StoreParams): Promise<Metadata> {
   const store = getStore((await params).slug);
   return { title: store ? `${PRODUCT.name} | ${store.name}` : "Not found" };
 }
 
-export default async function StorePage({ params }: PageProps<"/stores/[slug]">) {
+export default async function StorePage({ params }: StoreParams) {
   const store = getStore((await params).slug);
   if (!store) notFound();
 

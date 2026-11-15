@@ -32,7 +32,7 @@ export function BuySection({ bountiesHook }: { bountiesHook: ReturnType<typeof u
       {error && <p className={s.error}>⚠ {error}</p>}
       {!loading && open.length === 0 && (
         <div className={s.empty}>
-          No open bounties yet. Head to the <strong>Sell</strong> tab to post one.
+          No open bounties yet. Head to <strong>Post a bounty</strong> to create one.
         </div>
       )}
 
@@ -45,30 +45,46 @@ export function BuySection({ bountiesHook }: { bountiesHook: ReturnType<typeof u
   );
 }
 
-type StoreState = { quote?: Quote; loading?: boolean; error?: string };
+type QuoteState = { quote?: Quote; loading?: boolean; error?: string };
 
 function OpenBountyCard({ bounty, onFilled }: { bounty: Bounty; onFilled: () => void }) {
   const { account, submitDeal } = useWallet();
-  const [states, setStates] = useState<Record<string, StoreState>>({});
+  const [urlInput, setUrlInput] = useState("");
+  const [custom, setCustom] = useState<QuoteState>({});
+  const [demoStates, setDemoStates] = useState<Record<string, QuoteState>>({});
   const [tx, setTx] = useState<string | null>(null);
   const [submitErr, setSubmitErr] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState<string | null>(null);
 
-  async function scrape(slug: string) {
-    setStates((p) => ({ ...p, [slug]: { loading: true } }));
+  async function quoteUrl(url: string, setState: (st: QuoteState) => void) {
+    setState({ loading: true });
     try {
-      const url = `${window.location.origin}/stores/${slug}`;
       const quote = await scrapeQuote(bounty.id, url);
-      setStates((p) => ({ ...p, [slug]: { quote } }));
+      setState({ quote });
     } catch (e) {
-      setStates((p) => ({ ...p, [slug]: { error: (e as Error).message } }));
+      setState({ error: (e as Error).message });
     }
+  }
+
+  async function scrapeDemo(slug: string) {
+    const url = `${window.location.origin}/stores/${slug}`;
+    await quoteUrl(url, (st) => setDemoStates((p) => ({ ...p, [slug]: st })));
+  }
+
+  async function quoteCustom() {
+    const url = urlInput.trim();
+    if (!url) {
+      setCustom({ error: "Paste a product URL first" });
+      return;
+    }
+    await quoteUrl(url, setCustom);
   }
 
   async function submit(quote: Quote) {
     setSubmitErr(null);
     setSubmitting(quote.url);
     try {
+      // Must submit the exact url returned by /api/quote (oracle signs that string).
       const hash = await submitDeal({
         id: bounty.id,
         url: quote.url,
@@ -84,6 +100,43 @@ function OpenBountyCard({ bounty, onFilled }: { bounty: Bounty; onFilled: () => 
     }
   }
 
+  function QuoteResult({ quote, label }: { quote: Quote; label?: string }) {
+    const beats = BigInt(quote.priceCents) < bounty.refPriceCents;
+    const pct = discountPct(bounty.refPriceCents, BigInt(quote.priceCents));
+    return (
+      <div className={s.quoteResult}>
+        {label && <div className={s.storeName}>{label}</div>}
+        <div className={s.storeQuote}>
+          Verified {usd(quote.priceCents)}{" "}
+          {beats ? (
+            <DiscountBadge pct={pct} />
+          ) : (
+            <span className={s.noBeat}>does not beat {usd(bounty.refPriceCents)}</span>
+          )}
+        </div>
+        <div className={s.quoteUrl} title={quote.url}>
+          signed url: {quote.url}
+        </div>
+        {beats && account && (
+          <button
+            className={s.primaryBtn}
+            disabled={submitting === quote.url}
+            onClick={() => submit(quote)}
+          >
+            {submitting === quote.url
+              ? "Submitting…"
+              : `Submit deal · earn ${finderEarnedUsd(bounty.refPriceCents, BigInt(quote.priceCents), bounty.sharePct)}`}
+          </button>
+        )}
+        {beats && !account && (
+          <div className={s.connectHint}>
+            <WalletButton /> <span className={s.muted}>to submit this deal</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <article className={s.card}>
       <div className={s.cardHead}>
@@ -93,7 +146,7 @@ function OpenBountyCard({ bounty, onFilled }: { bounty: Bounty; onFilled: () => 
 
       <div className={s.meta}>
         <span>
-          MSRP <strong>{usd(bounty.refPriceCents)}</strong>
+          Reference <strong>{usd(bounty.refPriceCents)}</strong>
         </span>
         <span>
           Escrow <strong>{formatEther(bounty.escrow)} MON</strong>
@@ -103,42 +156,65 @@ function OpenBountyCard({ bounty, onFilled }: { bounty: Bounty; onFilled: () => 
         </span>
       </div>
 
+      <div className={s.huntUrl}>
+        <div className={s.approvedLabel}>Product URL</div>
+        <div className={s.urlRow}>
+          <input
+            className={s.urlInput}
+            placeholder="https://…/product"
+            value={urlInput}
+            onChange={(e) => setUrlInput(e.target.value)}
+          />
+          <button className={s.ghostBtn} disabled={custom.loading} onClick={() => void quoteCustom()}>
+            {custom.loading ? "Quoting…" : "Get quote"}
+          </button>
+        </div>
+        {custom.error && <span className={s.errorSm}>⚠ {custom.error}</span>}
+        {custom.quote && <QuoteResult quote={custom.quote} />}
+      </div>
+
       <div className={s.approved}>
-        <div className={s.approvedLabel}>🤖 Agent · approved marketplaces</div>
+        <div className={s.approvedLabel}>Try demo stores</div>
         {STORES.map((store) => {
-          const st = states[store.slug] ?? {};
-          const q = st.quote;
-          const pct = q ? discountPct(bounty.refPriceCents, BigInt(q.priceCents)) : 0;
+          const st = demoStates[store.slug] ?? {};
           return (
             <div key={store.slug} className={s.storeRow}>
               <div className={s.storeInfo}>
                 <span className={s.storeName}>{store.name}</span>
-                {q ? (
+                {!st.quote && !st.error && <span className={s.muted}>not checked</span>}
+                {st.quote && (
                   <span className={s.storeQuote}>
-                    {usd(q.priceCents)} <DiscountBadge pct={pct} />
+                    {usd(st.quote.priceCents)}{" "}
+                    {BigInt(st.quote.priceCents) < bounty.refPriceCents ? (
+                      <DiscountBadge
+                        pct={discountPct(bounty.refPriceCents, BigInt(st.quote.priceCents))}
+                      />
+                    ) : (
+                      <span className={s.noBeat}>no beat</span>
+                    )}
                   </span>
-                ) : (
-                  <span className={s.muted}>not checked</span>
                 )}
               </div>
 
-              {!q && (
+              {!st.quote && (
                 <button
                   className={s.ghostBtn}
                   disabled={st.loading}
-                  onClick={() => scrape(store.slug)}
+                  onClick={() => void scrapeDemo(store.slug)}
                 >
-                  {st.loading ? "Scraping…" : "Scrape with agent"}
+                  {st.loading ? "Quoting…" : "Quote"}
                 </button>
               )}
 
-              {q && account && (
+              {st.quote && BigInt(st.quote.priceCents) < bounty.refPriceCents && account && (
                 <button
                   className={s.primaryBtn}
-                  disabled={submitting === q.url}
-                  onClick={() => submit(q)}
+                  disabled={submitting === st.quote.url}
+                  onClick={() => submit(st.quote!)}
                 >
-                  {submitting === q.url ? "Submitting…" : `Submit · earn ${finderEarnedUsd(bounty.refPriceCents, BigInt(q.priceCents), bounty.sharePct)}`}
+                  {submitting === st.quote.url
+                    ? "Submitting…"
+                    : `Submit · earn ${finderEarnedUsd(bounty.refPriceCents, BigInt(st.quote.priceCents), bounty.sharePct)}`}
                 </button>
               )}
               {st.error && <span className={s.errorSm}>⚠ {st.error}</span>}

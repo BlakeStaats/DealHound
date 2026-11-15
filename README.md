@@ -47,6 +47,8 @@ OpenZeppelin `ECDSA` + `MessageHashUtils` and requires it to equal the oracle ba
 Binding `chainid` and the contract address into the digest prevents replay across chains or
 deployments. Full integration notes are in [`DYLAN_HANDOFF.md`](./DYLAN_HANDOFF.md).
 
+**Blake / frontend:** the oracle signs the exact `url` string. Submit `url` from `/api/quote` unchanged on-chain or the signature check fails.
+
 ## Monad features used
 
 - **Sub-second finality** — the headline demo: a finder submits a link and the payout +
@@ -75,19 +77,87 @@ submitDeal(uint256 id, string url, uint256 priceCents, bytes oracleSig)
 refund(uint256 id)
 ```
 
-## Build & test
+## Web app (oracle + marketplace)
+
+```bash
+cd web
+cp .env.example .env.local   # fill ORACLE_PRIVATE_KEY + ORACLE_ADDRESS (+ CONTRACT_ADDRESS)
+npm ci
+npm run dev
+```
+
+Generate a throwaway oracle key:
+
+```bash
+node -e "const {generatePrivateKey,privateKeyToAccount}=require('viem/accounts'); const pk=generatePrivateKey(); console.log(pk, privateKeyToAccount(pk).address)"
+```
+
+### Environment variables (`web/`)
+
+| Variable | Purpose |
+|---|---|
+| `ORACLE_PRIVATE_KEY` | Hex private key used to sign quotes |
+| `ORACLE_ADDRESS` | Address of that key (checked by `npm run verify`) |
+| `CONTRACT_ADDRESS` | MonadFLIP bounty contract (`address(this)` in the hash) |
+| `RPC_URL` / `MONAD_RPC_URL` | RPC for server-side bounty reads (`GET /api/bounties`) |
+| `NEXT_PUBLIC_CONTRACT_ADDRESS` | Same contract, exposed to the browser |
+| `NEXT_PUBLIC_MONAD_RPC_URL` | Browser RPC (defaults to public Monad testnet RPC) |
+| `CHAIN_ID` | `10143` (Monad testnet) |
+| `ALLOWED_HOSTS` | Comma-separated hosts `/api/quote` may fetch (Vercel deployment URLs are added automatically) |
+| `HUNTER_PRIVATE_KEY` | Wallet key for `npm run hunter` (never commit) |
+| `HUNTER_BASE_URL` | Base URL the hunter bot polls (default `http://localhost:3000`) |
+
+Never commit `.env.local`.
+
+### API
+
+#### `GET /api/oracle`
+
+Returns oracle config (no secrets).
+
+#### `GET /api/bounties`
+
+Open, unexpired bounties from the contract (`nextId` + `bounties(i)`).
+
+#### `POST /api/quote`
+
+Request: `{ "bountyId": "42", "url": "http://localhost:3000/stores/dealdepot" }`
+
+Demo store prices (cents): VoltMart `22900`, Redline Goods `20900`, DealDepot `18900`.
+
+Bot integration notes: [`/agents`](./web/app/agents/page.tsx) (served at `/agents` when the app is running).
+
+### Verify locally
+
+With `npm run dev` running:
+
+```bash
+cd web
+npm run verify
+```
+
+Expect `PASS`.
+
+## Build & test (contracts)
 
 ```bash
 forge install           # forge-std + openzeppelin-contracts
 forge test -vv          # 8 tests: valid deal, bad sig, price>=ref, refund-after-expiry, + extras
 ```
 
-## Deploy
+## Deploy (contracts)
 
 ```bash
 cp .env.example .env    # set ORACLE_ADDRESS, PRIVATE_KEY, MONAD_RPC_URL  (.env is gitignored)
 forge script script/Deploy.s.sol --rpc-url monad_testnet --broadcast
 ```
+
+## Deploy on Vercel
+
+1. Import the repo.
+2. Set **Root Directory** to `web`.
+3. Add env vars: `ORACLE_PRIVATE_KEY`, `ORACLE_ADDRESS`, `CONTRACT_ADDRESS`, `CHAIN_ID`, `ALLOWED_HOSTS` (include your production host).
+4. Deploy. Vercel’s own deployment URLs are allowlisted automatically for quoting mock stores.
 
 ## Repo layout
 
@@ -97,4 +167,5 @@ test/DealBounty.t.sol     Foundry tests
 script/Deploy.s.sol       deploy script
 abi/DealBounty.abi.json   ABI for the frontend/oracle
 DYLAN_HANDOFF.md          signing recipe + integration notes
+web/                      Next.js 16 marketplace + oracle
 ```

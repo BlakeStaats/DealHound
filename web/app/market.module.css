@@ -25,6 +25,19 @@
   max-width: 1080px;
   margin: 0 auto;
 }
+.topbarRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.agentsLink {
+  color: var(--muted);
+  font-size: 13px;
+  text-decoration: none;
+}
+.agentsLink:hover {
+  color: var(--accent-2);
+}
 .brand {
   display: flex;
   align-items: center;
@@ -128,7 +141,50 @@
   color: var(--text);
 }
 
-/* ---- approved marketplaces (agent) ---- */
+/* ---- hunt URL + demo stores ---- */
+.huntUrl {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.urlRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.urlInput {
+  flex: 1;
+  min-width: 160px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  color: var(--text);
+  font-size: 13px;
+}
+.quoteResult {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--panel-2);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.quoteUrl {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: var(--font-geist-mono), monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.noBeat {
+  color: #fbbf24;
+  font-size: 12px;
+  font-weight: 600;
+}
 .approved {
   border-top: 1px solid var(--line);
   padding-top: 12px;

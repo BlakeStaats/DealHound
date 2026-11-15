@@ -1,8 +1,25 @@
-// Shared, client-safe contract + chain config for the MonadFLIP marketplace.
-import type { Address, Chain } from "viem";
+// Shared contract + chain config for the MonadFLIP marketplace (client + server).
+import {
+  createPublicClient,
+  http,
+  type Address,
+  type Chain,
+} from "viem";
 
+/** Prefer public (browser) env, then server-only CONTRACT_ADDRESS, then deployed testnet address. */
 export const CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ??
+  process.env.CONTRACT_ADDRESS ??
   "0x629751D83702E11FFbB84a44fE9990a5E36B4501") as Address;
+
+/** RPC for reads. Server: RPC_URL / MONAD_RPC_URL; browser: NEXT_PUBLIC_MONAD_RPC_URL. */
+export function getRpcUrl(): string {
+  return (
+    process.env.RPC_URL ??
+    process.env.MONAD_RPC_URL ??
+    process.env.NEXT_PUBLIC_MONAD_RPC_URL ??
+    "https://testnet-rpc.monad.xyz"
+  );
+}
 
 export const monadTestnet = {
   id: 10143,
@@ -10,7 +27,7 @@ export const monadTestnet = {
   nativeCurrency: { name: "Monad", symbol: "MON", decimals: 18 },
   rpcUrls: {
     default: {
-      http: [process.env.NEXT_PUBLIC_MONAD_RPC_URL ?? "https://testnet-rpc.monad.xyz"],
+      http: [getRpcUrl()],
     },
   },
   blockExplorers: {
@@ -26,7 +43,7 @@ export function explorerAddress(addr: string): string {
   return `${monadTestnet.blockExplorers.default.url}/address/${addr}`;
 }
 
-// Minimal ABI — just what the marketplace reads/writes.
+// Minimal ABI — matches src/DealBounty.sol (nextId, bounties, createBounty, submitDeal, refund).
 export const DEAL_BOUNTY_ABI = [
   {
     type: "function",
@@ -116,6 +133,92 @@ export type Bounty = {
   item: string;
   url: string;
 };
+
+/** JSON shape returned by GET /api/bounties (open + unexpired only). */
+export type OpenBountyJson = {
+  id: string;
+  item: string;
+  refPriceCents: string;
+  sharePct: number;
+  escrow: string; // wei
+  expiry: string; // unix seconds
+};
+
+export function createDealPublicClient() {
+  return createPublicClient({
+    chain: monadTestnet,
+    transport: http(getRpcUrl()),
+  });
+}
+
+/** Read every bounty via nextId + bounties(i). */
+export async function readAllBounties(): Promise<Bounty[]> {
+  const client = createDealPublicClient();
+  const count = (await client.readContract({
+    address: CONTRACT_ADDRESS,
+    abi: DEAL_BOUNTY_ABI,
+    functionName: "nextId",
+  })) as bigint;
+
+  const ids = Array.from({ length: Number(count) }, (_, i) => BigInt(i));
+  const results = await Promise.all(
+    ids.map((id) =>
+      client.readContract({
+        address: CONTRACT_ADDRESS,
+        abi: DEAL_BOUNTY_ABI,
+        functionName: "bounties",
+        args: [id],
+      }),
+    ),
+  );
+
+  return results.map((r, i) => {
+    const b = r as readonly [
+      Address,
+      bigint,
+      number,
+      number,
+      bigint,
+      bigint,
+      Address,
+      bigint,
+      bigint,
+      string,
+      string,
+    ];
+    return {
+      id: ids[i],
+      poster: b[0],
+      expiry: b[1],
+      sharePct: Number(b[2]),
+      status: b[3] as BountyStatus,
+      refPriceCents: b[4],
+      escrow: b[5],
+      finder: b[6],
+      foundPriceCents: b[7],
+      payout: b[8],
+      item: b[9],
+      url: b[10],
+    } satisfies Bounty;
+  });
+}
+
+/** Open + not past expiry (for hunters / GET /api/bounties). */
+export async function readOpenUnexpiredBounties(nowSec = Math.floor(Date.now() / 1000)): Promise<Bounty[]> {
+  const all = await readAllBounties();
+  return all.filter((b) => b.status === BountyStatus.Open && Number(b.expiry) > nowSec);
+}
+
+export function toOpenBountyJson(b: Bounty): OpenBountyJson {
+  return {
+    id: b.id.toString(),
+    item: b.item,
+    refPriceCents: b.refPriceCents.toString(),
+    sharePct: b.sharePct,
+    escrow: b.escrow.toString(),
+    expiry: b.expiry.toString(),
+  };
+}
 
 // ---------- pure money helpers ----------
 
