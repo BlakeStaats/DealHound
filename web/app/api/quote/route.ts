@@ -8,8 +8,6 @@ import {
   quoteHash,
 } from "@/lib/oracle";
 
-export const dynamic = "force-dynamic";
-
 export async function POST(req: Request) {
   try {
     const { account, chainId, contract } = getConfig();
