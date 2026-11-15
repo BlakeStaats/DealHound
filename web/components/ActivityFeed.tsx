@@ -1,10 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Badge, Card, Divider, Flex, Typography } from "antd";
+import { CheckCircleFilled, PushpinOutlined } from "@ant-design/icons";
 import { discountPct, mon, usd } from "@/lib/contract";
 import type { Activity } from "./wallet";
-import { HunterBadge, shortAddr } from "./ui";
+import { DiscountBadge, HunterBadge, shortAddr } from "./ui";
 import s from "@/app/market.module.css";
+
+const { Text } = Typography;
 
 function ago(at: number | null, now: number): string {
   if (at === null) return "earlier";
@@ -14,7 +18,7 @@ function ago(at: number | null, now: number): string {
   return `${Math.floor(secs / 60)}m ago`;
 }
 
-/** Live strip of bounties posted and deals claimed, newest first. */
+/** Bounties posted and deals claimed, newest first. */
 export function ActivityFeed({ activity }: { activity: Activity[] }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -23,42 +27,48 @@ export function ActivityFeed({ activity }: { activity: Activity[] }) {
   }, []);
 
   if (activity.length === 0) return null;
+  const rows = activity.slice(0, 6);
 
   return (
-    <div className={s.feed}>
-      <div className={s.feedHead}>
-        <span className={s.liveDot}>Live activity</span>
-      </div>
-      <ul className={s.feedList}>
-        {activity.slice(0, 8).map((a) => {
-          const b = a.bounty;
-          const fresh = a.at !== null && now - a.at < 15000;
-          return (
-            <li key={a.key} className={fresh ? s.feedItemFresh : s.feedItem}>
+    <Card
+      size="small"
+      title="Live activity"
+      extra={<Badge status="success" text={<Text type="secondary">Updates every few seconds</Text>} />}
+      styles={{ body: { maxHeight: 224, overflowY: "auto", padding: "4px 12px" } }}
+    >
+      {rows.map((a, i) => {
+        const b = a.bounty;
+        const fresh = a.at !== null && now - a.at < 15000;
+        return (
+          <div key={a.key}>
+            <div className={`${s.feedRow} ${fresh ? s.feedFresh : ""}`} style={{ padding: "8px 4px" }}>
               {a.kind === "filled" ? (
                 <>
-                  <span className={s.feedIcon}>⚡</span>
-                  <span>
-                    <HunterBadge addr={b.finder} /> found <strong>{b.item}</strong> for{" "}
-                    <strong>{usd(b.foundPriceCents)}</strong>{" "}
-                    <span className={s.feedSave}>−{discountPct(b.refPriceCents, b.foundPriceCents)}%</span> · earned{" "}
-                    {mon(b.payout)}
-                  </span>
+                  <CheckCircleFilled style={{ color: "#389e0d" }} />
+                  <HunterBadge addr={b.finder} />
+                  <Text>
+                    found <Text strong>{b.item}</Text> for <Text strong>{usd(b.foundPriceCents)}</Text>
+                  </Text>
+                  <DiscountBadge pct={discountPct(b.refPriceCents, b.foundPriceCents)} />
+                  <Text type="secondary">earned {mon(b.payout)}</Text>
                 </>
               ) : (
                 <>
-                  <span className={s.feedIcon}>📌</span>
-                  <span>
-                    {shortAddr(b.poster)} posted <strong>{b.item}</strong> under {usd(b.refPriceCents)} ·{" "}
-                    {mon(b.escrow)} pool
-                  </span>
+                  <PushpinOutlined style={{ color: "#8c8c8c" }} />
+                  <Text>
+                    {shortAddr(b.poster)} posted <Text strong>{b.item}</Text> under {usd(b.refPriceCents)}
+                  </Text>
+                  <Text type="secondary">{mon(b.escrow)} pool</Text>
                 </>
               )}
-              <span className={s.feedTime}>{ago(a.at, now)}</span>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
+              <Text type="secondary" className={s.feedTime} style={{ fontSize: 12 }}>
+                {ago(a.at, now)}
+              </Text>
+            </div>
+            {i < rows.length - 1 && <Divider style={{ margin: 0 }} />}
+          </div>
+        );
+      })}
+    </Card>
   );
 }

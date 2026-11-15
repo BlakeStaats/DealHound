@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { readOpenUnexpiredBounties, toOpenBountyJson, CONTRACT_ADDRESS, getRpcUrl } from "@/lib/contract";
 
 /**
@@ -10,6 +11,7 @@ import { readOpenUnexpiredBounties, toOpenBountyJson, CONTRACT_ADDRESS, getRpcUr
  * (or NEXT_PUBLIC_MONAD_RPC_URL). Defaults to the deployed Monad testnet contract + public RPC.
  */
 export async function GET() {
+  await connection(); // always read the chain at request time, never at build
   try {
     const open = await readOpenUnexpiredBounties();
     return Response.json({

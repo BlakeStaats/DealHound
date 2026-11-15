@@ -1,33 +1,56 @@
 "use client";
 
 import type { Hex } from "viem";
+import { App, Avatar, Button, Tag } from "antd";
+import {
+  HeartOutlined,
+  HomeOutlined,
+  LaptopOutlined,
+  PlayCircleOutlined,
+  RobotOutlined,
+  SkinOutlined,
+  TagOutlined,
+  UserOutlined,
+  WalletOutlined,
+} from "@ant-design/icons";
 import { useWallet } from "./wallet";
 import { QuoteError } from "@/lib/friendly";
-import { matchingDemoProducts } from "@/lib/match";
 import { classifyCategory } from "@/lib/categories";
-import s from "@/app/market.module.css";
 
 export function shortAddr(a?: string): string {
   return a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "";
 }
 
-/** The headline savings label used on marketplace + NFT cards. */
-export function DiscountBadge({ pct, size = "md" }: { pct: number; size?: "md" | "lg" }) {
+/** Savings vs the reference price, e.g. "−24%". */
+export function DiscountBadge({ pct }: { pct: number }) {
   if (pct <= 0) return null;
-  return <span className={`${s.badge} ${size === "lg" ? s.badgeLg : ""}`}>−{pct}% vs MSRP</span>;
+  return (
+    <Tag color="green" style={{ marginInlineEnd: 0, fontWeight: 600 }}>
+      −{pct}%
+    </Tag>
+  );
 }
 
-export function WalletButton() {
+export function WalletButton({ block }: { block?: boolean }) {
   const { account, connect, connecting, hasWallet } = useWallet();
-  if (account) return <span className={s.walletPill}>🟢 {shortAddr(account)}</span>;
+  const { message } = App.useApp();
+  if (account) {
+    return (
+      <Button icon={<WalletOutlined />} block={block}>
+        {shortAddr(account)}
+      </Button>
+    );
+  }
   return (
-    <button
-      className={s.walletBtn}
-      disabled={connecting}
-      onClick={() => connect().catch((e) => alert(e.message))}
+    <Button
+      type="primary"
+      icon={<WalletOutlined />}
+      loading={connecting}
+      block={block}
+      onClick={() => connect().catch((e) => message.error((e as Error).message))}
     >
-      {connecting ? "Connecting…" : hasWallet ? "Connect wallet" : "Install a wallet"}
-    </button>
+      {hasWallet ? "Connect wallet" : "Install a wallet"}
+    </Button>
   );
 }
 
@@ -46,34 +69,41 @@ export function isAgent(addr?: string): boolean {
 export function HunterBadge({ addr }: { addr: string }) {
   const agent = isAgent(addr);
   return (
-    <span className={agent ? s.agentBadge : s.humanBadge} title={addr}>
-      {agent ? "🤖 Agent" : "🧑 Human"} {shortAddr(addr)}
-    </span>
+    <Tag
+      icon={agent ? <RobotOutlined /> : <UserOutlined />}
+      color={agent ? "purple" : "blue"}
+      title={addr}
+      style={{ marginInlineEnd: 0 }}
+    >
+      {agent ? "Agent" : "Human"} {shortAddr(addr)}
+    </Tag>
   );
 }
 
-// ---------- product tile + countdown ----------
+// ---------- category icon, product tile, countdown ----------
 
-const TILE_BG: Record<string, string> = {
-  tech: "linear-gradient(135deg,#dbeafe,#bfdbfe)",
-  apparel: "linear-gradient(135deg,#fee2e2,#fecaca)",
-  home: "linear-gradient(135deg,#dcfce7,#bbf7d0)",
-  gaming: "linear-gradient(135deg,#ede9fe,#ddd6fe)",
-  beauty: "linear-gradient(135deg,#fce7f3,#fbcfe8)",
-  other: "linear-gradient(135deg,#f1f5f9,#e2e8f0)",
+const CATEGORY_ICON: Record<string, React.ReactNode> = {
+  tech: <LaptopOutlined />,
+  apparel: <SkinOutlined />,
+  home: <HomeOutlined />,
+  gaming: <PlayCircleOutlined />,
+  beauty: <HeartOutlined />,
+  other: <TagOutlined />,
 };
 
-export function ProductTile({ item, size = 56 }: { item: string; size?: number }) {
+export function CategoryIcon({ id }: { id: string }) {
+  return <>{CATEGORY_ICON[id] ?? CATEGORY_ICON.other}</>;
+}
+
+export function ProductTile({ item, size = 48 }: { item: string; size?: number }) {
   const cat = classifyCategory(item);
-  const emoji = matchingDemoProducts(item)[0]?.emoji ?? cat.icon;
   return (
-    <div
-      className={s.tile}
-      style={{ width: size, height: size, fontSize: size * 0.5, background: TILE_BG[cat.id] ?? TILE_BG.other }}
-      aria-hidden="true"
-    >
-      {emoji}
-    </div>
+    <Avatar
+      shape="square"
+      size={size}
+      icon={<CategoryIcon id={cat.id} />}
+      style={{ background: "#eef0f4", color: "#5b6270", flex: "none" }}
+    />
   );
 }
 

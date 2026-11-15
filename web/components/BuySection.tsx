@@ -1,7 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { Hex } from "viem";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  Drawer,
+  Empty,
+  Flex,
+  Input,
+  Modal,
+  Result,
+  Skeleton,
+  Space,
+  Statistic,
+  Tag,
+  Typography,
+} from "antd";
+import { CheckCircleOutlined, ClockCircleOutlined, ExportOutlined } from "@ant-design/icons";
 import {
   Bounty,
   BountyStatus,
@@ -19,6 +37,7 @@ import { friendlyQuoteError, friendlyTxError } from "@/lib/friendly";
 import { useBounties, useWallet, waitForTx } from "./wallet";
 import { ActivityFeed } from "./ActivityFeed";
 import {
+  CategoryIcon,
   DiscountBadge,
   ProductTile,
   Quote,
@@ -28,6 +47,8 @@ import {
   timeLeft,
 } from "./ui";
 import s from "@/app/market.module.css";
+
+const { Title, Text } = Typography;
 
 type Win = { bounty: Bounty; quote: Quote; hash: Hex; payout: bigint };
 
@@ -54,52 +75,56 @@ export function BuySection({
   }
 
   return (
-    <section>
+    <Flex vertical gap={24}>
       <ActivityFeed activity={activity} />
 
-      <nav className={s.catbar}>
-        <button
-          className={category === "all" ? s.catPillActive : s.catPill}
-          onClick={() => setCategory("all")}
-        >
-          🏆 All <span className={s.catCount}>{open.length}</span>
-        </button>
-        {SECTORS.map((sec) => (
-          <button
-            key={sec.id}
-            className={category === sec.id ? s.catPillActive : s.catPill}
-            onClick={() => setCategory(sec.id)}
-          >
-            {sec.icon} {sec.label}
-            {counts.get(sec.id) ? <span className={s.catCount}>{counts.get(sec.id)}</span> : null}
-          </button>
-        ))}
-      </nav>
+      <Flex vertical gap={12}>
+        <Flex justify="space-between" align="center" wrap gap={8}>
+          <Title level={4} style={{ margin: 0 }}>
+            Open bounties
+          </Title>
+          <Badge status="success" text={<Text type="secondary">Live</Text>} />
+        </Flex>
 
-      <div className={s.sectionHead}>
-        <h2>Open bounties</h2>
-        <span className={s.liveDot}>Live · updates every few seconds</span>
-      </div>
+        <Flex wrap gap={8}>
+          <Tag.CheckableTag checked={category === "all"} onChange={() => setCategory("all")}>
+            All ({open.length})
+          </Tag.CheckableTag>
+          {SECTORS.filter((sec) => counts.get(sec.id)).map((sec) => (
+            <Tag.CheckableTag key={sec.id} checked={category === sec.id} onChange={() => setCategory(sec.id)}>
+              <CategoryIcon id={sec.id} /> {sec.label} ({counts.get(sec.id)})
+            </Tag.CheckableTag>
+          ))}
+        </Flex>
+      </Flex>
 
-      {loading && <p className={s.muted}>Loading bounties from Monad…</p>}
-      {error && <p className={s.error}>⚠ Couldn&apos;t reach Monad: {error}</p>}
-      {!loading && open.length === 0 && (
-        <div className={s.empty}>
-          No open bounties yet. Head to <strong>Post a bounty</strong> to create one.
+      {error && <Alert type="error" showIcon title="Couldn't reach Monad" description={error} />}
+      {loading ? (
+        <div className={s.grid}>
+          {[0, 1, 2].map((i) => (
+            <Card key={i}>
+              <Skeleton active />
+            </Card>
+          ))}
+        </div>
+      ) : shown.length === 0 ? (
+        <Card>
+          <Empty
+            description={
+              open.length === 0 ? "No open bounties yet. Post one to get started." : "No open bounties in this category."
+            }
+          />
+        </Card>
+      ) : (
+        <div className={s.grid}>
+          {shown.map((b) => (
+            <BountyCard key={b.id.toString()} bounty={b} onHunt={() => setHuntingId(b.id)} />
+          ))}
         </div>
       )}
-      {!loading && open.length > 0 && shown.length === 0 && (
-        <div className={s.empty}>No open bounties in this category yet.</div>
-      )}
-
-      <div className={s.grid}>
-        {shown.map((b) => (
-          <BountyCard key={b.id.toString()} bounty={b} onHunt={() => setHuntingId(b.id)} />
-        ))}
-      </div>
 
       {hunting && (
-        <HuntPanel
+        <HuntDrawer
           key={hunting.id.toString()}
           bounty={hunting}
           onClose={() => setHuntingId(null)}
@@ -110,67 +135,60 @@ export function BuySection({
           }}
         />
       )}
-      {win && (
-        <SuccessModal
-          win={win}
-          onClose={() => setWin(null)}
-          onViewProofs={() => {
-            setWin(null);
-            onViewProofs();
-          }}
-        />
-      )}
-    </section>
+      <SuccessModal
+        win={win}
+        onClose={() => setWin(null)}
+        onViewProofs={() => {
+          setWin(null);
+          onViewProofs();
+        }}
+      />
+    </Flex>
   );
 }
 
 function BountyCard({ bounty: b, onHunt }: { bounty: Bounty; onHunt: () => void }) {
   const cat = classifyCategory(b.item);
   return (
-    <article className={s.card}>
-      <div className={s.cardTop}>
-        <span className={s.catChip}>
-          {cat.icon} {cat.label}
-        </span>
-        <span className={s.timeLeft}>⏱ {timeLeft(b.expiry)}</span>
-      </div>
+    <Card styles={{ body: { display: "flex", flexDirection: "column", gap: 16, height: "100%" } }}>
+      <Flex justify="space-between" align="center">
+        <Tag icon={<CategoryIcon id={cat.id} />} style={{ marginInlineEnd: 0 }}>
+          {cat.label}
+        </Tag>
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          <ClockCircleOutlined /> {timeLeft(b.expiry)}
+        </Text>
+      </Flex>
 
-      <div className={s.cardMain}>
+      <Flex gap={12} align="center">
         <ProductTile item={b.item} />
-        <div>
-          <h3 className={s.cardTitle}>{b.item}</h3>
-          <div className={s.cardSub}>
+        <div style={{ minWidth: 0 }}>
+          <Title level={5} style={{ margin: 0 }} ellipsis={{ rows: 2 }}>
+            {b.item}
+          </Title>
+          <Text type="secondary" style={{ fontSize: 12 }}>
             #{b.id.toString()} · posted by {shortAddr(b.poster)}
-          </div>
+          </Text>
         </div>
-      </div>
+      </Flex>
 
-      <div className={s.stats}>
-        <div>
-          <div className={s.statLabel}>Find it under</div>
-          <div className={s.statBig}>{usd(b.refPriceCents)}</div>
-        </div>
-        <div>
-          <div className={s.statLabel}>Reward pool</div>
-          <div className={s.statMid}>{mon(b.escrow)}</div>
-        </div>
-        <div>
-          <div className={s.statLabel}>Finder gets</div>
-          <div className={s.statMid}>{b.sharePct}% of savings</div>
-        </div>
-      </div>
+      <Flex justify="space-between" gap={8}>
+        <Statistic title="Find it under" value={usd(b.refPriceCents)} />
+        <Statistic title="Reward pool" value={mon(b.escrow)} styles={{ content: { fontSize: 16 } }} />
+        <Statistic title="Finder share" value={`${b.sharePct}%`} styles={{ content: { fontSize: 16 } }} />
+      </Flex>
 
-      <button className={s.huntBtn} onClick={onHunt}>
-        Hunt this deal →
-      </button>
-    </article>
+      <Button type="primary" block onClick={onHunt} style={{ marginTop: "auto" }}>
+        Hunt this deal
+      </Button>
+    </Card>
   );
 }
 
 type QuoteState = { quote?: Quote; loading?: boolean; error?: string };
 type TxPhase = "idle" | "wallet" | "confirming";
 
-function HuntPanel({
+function HuntDrawer({
   bounty,
   onClose,
   onWon,
@@ -187,12 +205,6 @@ function HuntPanel({
   const [activeUrl, setActiveUrl] = useState<string | null>(null);
   const [txErr, setTxErr] = useState<string | null>(null);
   const [pendingHash, setPendingHash] = useState<Hex | null>(null);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && phase === "idle" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose, phase]);
 
   const demoProducts = matchingDemoProducts(bounty.item);
   const demoRows = demoProducts.flatMap((product) =>
@@ -235,104 +247,126 @@ function HuntPanel({
     }
   }
 
-  function QuoteLine({ st, label, onQuote }: { st: QuoteState; label: string; onQuote?: () => void }) {
+  function QuoteRow({ st, label, onQuote }: { st: QuoteState; label: string; onQuote?: () => void }) {
     const q = st.quote;
     const price = q ? BigInt(q.priceCents) : null;
     const beats = price !== null && price < bounty.refPriceCents;
     const busy = phase !== "idle" && q?.url === activeUrl;
     return (
-      <div className={s.quoteLine}>
-        <div className={s.quoteLineHead}>
-          <span className={s.storeName}>{label}</span>
-          {!q && onQuote && (
-            <button className={s.ghostBtn} disabled={st.loading} onClick={onQuote}>
-              {st.loading ? "Checking…" : "Check price"}
-            </button>
-          )}
-          {q && price !== null && (
-            <span className={s.storeQuote}>
-              {usd(price)} {beats ? <DiscountBadge pct={discountPct(bounty.refPriceCents, price)} /> : null}
-            </span>
-          )}
-        </div>
-        {st.error && <div className={s.errorSm}>⚠ {st.error}</div>}
-        {q && price !== null && !beats && (
-          <div className={s.noBeat}>
-            {usd(price)} isn&apos;t below the {usd(bounty.refPriceCents)} target. Keep hunting.
-          </div>
-        )}
-        {q && price !== null && beats && (
-          <>
-            <div className={s.verified}>✓ Price verified and signed by the oracle</div>
-            {account ? (
-              <button className={s.primaryBtn} disabled={phase !== "idle"} onClick={() => void submit(q)}>
-                {busy && phase === "wallet"
-                  ? "Confirm in your wallet…"
-                  : busy && phase === "confirming"
-                    ? "Settling on Monad…"
-                    : `Claim · earn ${mon(payoutWei(bounty.escrow, bounty.sharePct, bounty.refPriceCents, price))}`}
-              </button>
-            ) : (
-              <div className={s.connectHint}>
-                <WalletButton /> <span className={s.muted}>to claim this deal</span>
-              </div>
+      <Card size="small">
+        <Flex vertical gap={8}>
+          <Flex justify="space-between" align="center" gap={8}>
+            <Text strong>{label}</Text>
+            {!q && onQuote && (
+              <Button size="small" loading={st.loading} onClick={onQuote}>
+                Check price
+              </Button>
             )}
-          </>
-        )}
-      </div>
+            {q && price !== null && (
+              <Space size={8}>
+                <Text strong>{usd(price)}</Text>
+                {beats && <DiscountBadge pct={discountPct(bounty.refPriceCents, price)} />}
+              </Space>
+            )}
+          </Flex>
+          {st.error && <Alert type="error" showIcon title={st.error} />}
+          {q && price !== null && !beats && (
+            <Alert
+              type="warning"
+              showIcon
+              title={`${usd(price)} isn't below the ${usd(bounty.refPriceCents)} target.`}
+            />
+          )}
+          {q && price !== null && beats && (
+            <>
+              <Text type="success" style={{ fontSize: 12 }}>
+                <CheckCircleOutlined /> Price verified and signed by the oracle
+              </Text>
+              {account ? (
+                <Button
+                  type="primary"
+                  block
+                  loading={busy}
+                  disabled={phase !== "idle" && !busy}
+                  onClick={() => void submit(q)}
+                >
+                  {busy && phase === "wallet"
+                    ? "Confirm in your wallet"
+                    : busy && phase === "confirming"
+                      ? "Settling on Monad"
+                      : `Claim and earn ${mon(payoutWei(bounty.escrow, bounty.sharePct, bounty.refPriceCents, price))}`}
+                </Button>
+              ) : (
+                <WalletButton block />
+              )}
+            </>
+          )}
+        </Flex>
+      </Card>
     );
   }
 
+  const idle = phase === "idle";
+
   return (
-    <>
-      <div className={s.overlay} onClick={() => phase === "idle" && onClose()} />
-      <aside className={s.drawer} role="dialog" aria-label={`Hunt ${bounty.item}`}>
-        <div className={s.drawerHead}>
-          <ProductTile item={bounty.item} size={48} />
-          <div className={s.drawerTitle}>
-            <h3>{bounty.item}</h3>
-            <div className={s.cardSub}>
+    <Drawer
+      open
+      size={440}
+      onClose={onClose}
+      closable={idle}
+      keyboard={idle}
+      mask={{ closable: idle, blur: false }}
+      destroyOnHidden
+      title={
+        <Flex gap={12} align="center">
+          <ProductTile item={bounty.item} size={40} />
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 15 }}>{bounty.item}</div>
+            <Text type="secondary" style={{ fontSize: 12, fontWeight: 400 }}>
               Bounty #{bounty.id.toString()} · {timeLeft(bounty.expiry)}
-            </div>
+            </Text>
           </div>
-          <button className={s.closeBtn} onClick={onClose} disabled={phase !== "idle"} aria-label="Close">
-            ×
-          </button>
-        </div>
+        </Flex>
+      }
+    >
+      <Flex vertical gap={24}>
+        <Alert
+          type="info"
+          title={
+            <>
+              Find it for less than <strong>{usd(bounty.refPriceCents)}</strong>. You earn{" "}
+              <strong>{bounty.sharePct}% of the savings</strong>, paid from a {mon(bounty.escrow)} pool.
+            </>
+          }
+        />
 
-        <div className={s.goal}>
-          Find it for less than <strong>{usd(bounty.refPriceCents)}</strong>. You earn{" "}
-          <strong>{bounty.sharePct}% of the savings</strong>, paid from a {mon(bounty.escrow)} pool.
-        </div>
-
-        <div className={s.drawerSection}>
-          <div className={s.approvedLabel}>Paste a product link</div>
-          <div className={s.urlRow}>
-            <input
-              className={s.urlInput}
+        <Flex vertical gap={8}>
+          <Text type="secondary">Paste a product link</Text>
+          <Space.Compact style={{ width: "100%" }}>
+            <Input
               placeholder="https://store.com/product"
               value={urlInput}
               onChange={(e) => setUrlInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && urlInput.trim() && void quoteUrl(urlInput.trim(), setCustom)}
+              onPressEnter={() => urlInput.trim() && void quoteUrl(urlInput.trim(), setCustom)}
             />
-            <button
-              className={s.ghostBtn}
-              disabled={custom.loading || !urlInput.trim()}
+            <Button
+              loading={custom.loading}
+              disabled={!urlInput.trim()}
               onClick={() => void quoteUrl(urlInput.trim(), setCustom)}
             >
-              {custom.loading ? "Checking…" : "Check price"}
-            </button>
-          </div>
-          {(custom.quote || custom.error) && <QuoteLine st={custom} label="Your link" />}
-        </div>
+              Check price
+            </Button>
+          </Space.Compact>
+          {(custom.quote || custom.error) && <QuoteRow st={custom} label="Your link" />}
+        </Flex>
 
-        <div className={s.drawerSection}>
-          <div className={s.approvedLabel}>Or try a demo store</div>
+        <Flex vertical gap={8}>
+          <Text type="secondary">Or try a demo store</Text>
           {demoRows.length === 0 && (
-            <span className={s.muted}>No demo store sells this item. Paste a real product link above.</span>
+            <Text type="secondary">No demo store sells this item. Paste a real product link above.</Text>
           )}
           {demoRows.map(({ key, store, product }) => (
-            <QuoteLine
+            <QuoteRow
               key={key}
               st={demo[key] ?? {}}
               label={demoProducts.length > 1 ? `${store.name} · ${product.name}` : store.name}
@@ -343,19 +377,19 @@ function HuntPanel({
               }
             />
           ))}
-        </div>
+        </Flex>
 
-        {txErr && <p className={s.error}>⚠ {txErr}</p>}
+        {txErr && <Alert type="error" showIcon title={txErr} />}
         {phase === "confirming" && pendingHash && (
-          <p className={s.muted}>
-            Waiting for Monad to confirm…{" "}
+          <Text type="secondary">
+            Waiting for Monad to confirm.{" "}
             <a href={explorerTx(pendingHash)} target="_blank" rel="noreferrer">
-              view tx ↗
+              View transaction <ExportOutlined />
             </a>
-          </p>
+          </Text>
         )}
-      </aside>
-    </>
+      </Flex>
+    </Drawer>
   );
 }
 
@@ -364,59 +398,39 @@ function SuccessModal({
   onClose,
   onViewProofs,
 }: {
-  win: Win;
+  win: Win | null;
   onClose: () => void;
   onViewProofs: () => void;
 }) {
+  return (
+    <Modal open={!!win} onCancel={onClose} footer={null} width={480} centered destroyOnHidden>
+      {win && <SuccessBody win={win} onViewProofs={onViewProofs} />}
+    </Modal>
+  );
+}
+
+function SuccessBody({ win, onViewProofs }: { win: Win; onViewProofs: () => void }) {
   const { bounty: b, quote, hash, payout } = win;
   const price = BigInt(quote.priceCents);
-  const pct = discountPct(b.refPriceCents, price);
   return (
-    <>
-      <div className={s.overlay} onClick={onClose} />
-      <div className={s.modal} role="dialog" aria-label="Deal claimed">
-        <div className={s.confetti} aria-hidden="true">
-          🎉 ✨ 🐾 ✨ 🎉
-        </div>
-        <h2 className={s.modalTitle}>Deal found and paid out</h2>
-        <p className={s.muted}>Verified by the oracle and settled on Monad.</p>
-
-        <div className={s.winCard}>
-          <ProductTile item={b.item} size={64} />
-          <div>
-            <div className={s.winItem}>{b.item}</div>
-            <div className={s.priceLine}>
-              <span className={s.strike}>{usd(b.refPriceCents)}</span>
-              <span className={s.foundPrice}>{usd(price)}</span>
-              <DiscountBadge pct={pct} />
-            </div>
-          </div>
-        </div>
-
-        <div className={s.winStats}>
-          <div>
-            <div className={s.statLabel}>Buyer saves</div>
-            <div className={s.statBig}>{usd(savingsCents(b.refPriceCents, price))}</div>
-          </div>
-          <div>
-            <div className={s.statLabel}>You earned</div>
-            <div className={s.statBig}>{mon(payout)}</div>
-          </div>
-          <div>
-            <div className={s.statLabel}>Minted</div>
-            <div className={s.statBig}>Deal Proof #{b.id.toString()}</div>
-          </div>
-        </div>
-
-        <div className={s.modalActions}>
-          <button className={s.primaryBtn} onClick={onViewProofs}>
-            See your Deal Proof NFT
-          </button>
-          <a className={s.ghostBtn} href={explorerTx(hash)} target="_blank" rel="noreferrer">
-            View transaction ↗
-          </a>
-        </div>
-      </div>
-    </>
+    <Result
+      status="success"
+      title="Deal found and paid out"
+      subTitle={`${b.item} for ${usd(price)} instead of ${usd(b.refPriceCents)}. Verified by the oracle and settled on Monad.`}
+      extra={[
+        <Button type="primary" key="nft" onClick={onViewProofs}>
+          See your Deal Proof
+        </Button>,
+        <Button key="tx" href={explorerTx(hash)} target="_blank" icon={<ExportOutlined />}>
+          View transaction
+        </Button>,
+      ]}
+    >
+      <Flex justify="space-around" gap={16} wrap>
+        <Statistic title="Buyer saves" value={usd(savingsCents(b.refPriceCents, price))} />
+        <Statistic title="You earned" value={mon(payout)} />
+        <Statistic title="Minted" value={`Deal Proof #${b.id.toString()}`} />
+      </Flex>
+    </Result>
   );
 }

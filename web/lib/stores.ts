@@ -24,7 +24,6 @@ export type Product = {
   name: string;
   brand: string;
   description: string;
-  emoji: string; // image placeholder
   breadcrumb: string;
   /** price per store slug; listPrice is the struck-through "was" price */
   prices: Record<string, { price: number; listPrice?: number }>;
@@ -82,7 +81,6 @@ export const PRODUCTS: Product[] = [
     brand: "Apple",
     description:
       "Active Noise Cancellation, Adaptive Audio, Transparency mode, Personalized Spatial Audio, and a MagSafe charging case with USB-C.",
-    emoji: "🎧",
     breadcrumb: "Audio › Headphones › Wireless Earbuds",
     prices: {
       voltmart: { price: 229.0, listPrice: 249.0 },
@@ -96,7 +94,6 @@ export const PRODUCTS: Product[] = [
     brand: "Nike",
     description:
       "The original high-top silhouette in premium leather with an encapsulated Air unit and the classic Wings logo.",
-    emoji: "👟",
     breadcrumb: "Shoes › Men's Sneakers › Basketball",
     prices: {
       voltmart: { price: 189.0, listPrice: 180.0 },
@@ -110,7 +107,6 @@ export const PRODUCTS: Product[] = [
     brand: "Dyson",
     description:
       "Laser dust detection, piezo particle sensor with on-screen counts, and up to 60 minutes of fade-free runtime.",
-    emoji: "🧹",
     breadcrumb: "Appliances › Floor Care › Cordless Vacuums",
     prices: {
       voltmart: { price: 749.99, listPrice: 749.99 },
@@ -124,7 +120,6 @@ export const PRODUCTS: Product[] = [
     brand: "Sony",
     description:
       "1TB SSD, ultra-high-speed loading, haptic feedback and adaptive triggers on the DualSense controller.",
-    emoji: "🎮",
     breadcrumb: "Gaming › Consoles › PlayStation",
     prices: {
       voltmart: { price: 499.99, listPrice: 499.99 },
