@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Badge, Card, Divider, Flex, Typography } from "antd";
 import { CheckCircleFilled, PushpinOutlined } from "@ant-design/icons";
-import { discountPct, mon, usd } from "@/lib/contract";
+import { discountPct, mon, usd, usdMon } from "@/lib/contract";
 import type { Activity } from "./wallet";
 import { DiscountBadge, HunterBadge, shortAddr } from "./ui";
 import s from "@/app/market.module.css";
@@ -50,7 +50,7 @@ export function ActivityFeed({ activity }: { activity: Activity[] }) {
                     found <Text strong>{b.item}</Text> for <Text strong>{usd(b.foundPriceCents)}</Text>
                   </Text>
                   <DiscountBadge pct={discountPct(b.refPriceCents, b.foundPriceCents)} />
-                  <Text type="secondary">earned {mon(b.payout)}</Text>
+                  <Text type="secondary">earned {usdMon(b.payout)}</Text>
                 </>
               ) : (
                 <>

@@ -1,7 +1,7 @@
 "use client";
 
 import { Card, Empty, Flex, Table, Tag, Typography } from "antd";
-import { Bounty, BountyStatus, discountPct, mon, savingsCents, usd } from "@/lib/contract";
+import { Bounty, BountyStatus, discountPct, savingsCents, usd, usdMon } from "@/lib/contract";
 import { DiscountBadge, HunterBadge, ProductTile } from "./ui";
 import s from "@/app/market.module.css";
 
@@ -63,7 +63,7 @@ function NftCard({ bounty: b }: { bounty: Bounty }) {
       </Text>
       <Flex align="center" gap={8} wrap>
         <HunterBadge addr={b.finder} />
-        <Text>earned {mon(b.payout)}</Text>
+        <Text>earned {usdMon(b.payout)}</Text>
       </Flex>
     </Card>
   );
@@ -94,7 +94,7 @@ function Leaderboard({ bounties }: { bounties: Bounty[] }) {
         columns={[
           { title: "#", dataIndex: "rank", width: 48 },
           { title: "Hunter", dataIndex: "addr", render: (a: string) => <HunterBadge addr={a} /> },
-          { title: "Earned", dataIndex: "earned", render: (v: bigint) => mon(v) },
+          { title: "Earned", dataIndex: "earned", render: (v: bigint) => usdMon(v) },
           { title: "Saved buyers", dataIndex: "savedCents", render: (v: bigint) => usd(v) },
           { title: "Deals", dataIndex: "deals", width: 72 },
         ]}

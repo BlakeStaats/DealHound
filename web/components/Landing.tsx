@@ -69,7 +69,7 @@ export function Landing({ onEnter }: { onEnter: () => void }) {
           items={[
             {
               title: "Post a bounty",
-              content: "Escrow MON against an item's reference price and set a finder's share.",
+              content: "Lock an item's reference price in MON and set a finder's share of every dollar saved.",
             },
             {
               title: "The pack hunts",

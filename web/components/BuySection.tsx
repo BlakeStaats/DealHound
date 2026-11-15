@@ -23,12 +23,16 @@ import { CheckCircleOutlined, ClockCircleOutlined, ExportOutlined } from "@ant-d
 import {
   Bounty,
   BountyStatus,
+  USD_PER_MON,
   discountPct,
   explorerTx,
+  isFullPool,
   mon,
   payoutWei,
   savingsCents,
   usd,
+  usdMon,
+  weiToUsdCents,
 } from "@/lib/contract";
 import { STORES, storePath } from "@/lib/stores";
 import { matchingDemoProducts } from "@/lib/match";
@@ -175,7 +179,15 @@ function BountyCard({ bounty: b, onHunt }: { bounty: Bounty; onHunt: () => void 
       <Flex justify="space-between" gap={8}>
         <Statistic title="Find it under" value={usd(b.refPriceCents)} />
         <Statistic title="Reward pool" value={mon(b.escrow)} styles={{ content: { fontSize: 16 } }} />
-        <Statistic title="Finder share" value={`${b.sharePct}%`} styles={{ content: { fontSize: 16 } }} />
+        <Statistic
+          title="Finder gets"
+          value={
+            isFullPool(b.escrow, b.refPriceCents)
+              ? `${b.sharePct}% of savings`
+              : `up to ${usd(weiToUsdCents(payoutWei(b.escrow, b.sharePct, b.refPriceCents, BigInt(0))))}`
+          }
+          styles={{ content: { fontSize: 16 } }}
+        />
       </Flex>
 
       <Button type="primary" block onClick={onHunt} style={{ marginTop: "auto" }}>
@@ -294,7 +306,7 @@ function HuntDrawer({
                     ? "Confirm in your wallet"
                     : busy && phase === "confirming"
                       ? "Settling on Monad"
-                      : `Claim and earn ${mon(payoutWei(bounty.escrow, bounty.sharePct, bounty.refPriceCents, price))}`}
+                      : `Claim and earn ${usdMon(payoutWei(bounty.escrow, bounty.sharePct, bounty.refPriceCents, price))}`}
                 </Button>
               ) : (
                 <WalletButton block />
@@ -334,8 +346,19 @@ function HuntDrawer({
           type="info"
           title={
             <>
-              Find it for less than <strong>{usd(bounty.refPriceCents)}</strong>. You earn{" "}
-              <strong>{bounty.sharePct}% of the savings</strong>, paid from a {mon(bounty.escrow)} pool.
+              Find it for less than <strong>{usd(bounty.refPriceCents)}</strong>.{" "}
+              {isFullPool(bounty.escrow, bounty.refPriceCents) ? (
+                <>
+                  You earn <strong>{bounty.sharePct}% of every dollar you save</strong>, paid in MON from a{" "}
+                  {mon(bounty.escrow)} pool (demo rate: 1 MON = ${USD_PER_MON}).
+                </>
+              ) : (
+                <>
+                  This bounty&apos;s pool is smaller than its reference price, so you earn less: up to{" "}
+                  <strong>{usdMon(payoutWei(bounty.escrow, bounty.sharePct, bounty.refPriceCents, BigInt(0)))}</strong>,
+                  more the bigger the discount.
+                </>
+              )}
             </>
           }
         />
@@ -428,7 +451,7 @@ function SuccessBody({ win, onViewProofs }: { win: Win; onViewProofs: () => void
     >
       <Flex justify="space-around" gap={16} wrap>
         <Statistic title="Buyer saves" value={usd(savingsCents(b.refPriceCents, price))} />
-        <Statistic title="You earned" value={mon(payout)} />
+        <Statistic title="You earned" value={usd(weiToUsdCents(payout))} suffix={<Text type="secondary">{mon(payout)}</Text>} />
         <Statistic title="Minted" value={`Deal Proof #${b.id.toString()}`} />
       </Flex>
     </Result>

@@ -1,15 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { parseEther } from "viem";
+import { formatEther } from "viem";
 import { Alert, Button, Card, Col, Flex, Input, InputNumber, Row, Space, Typography } from "antd";
 import { ExportOutlined } from "@ant-design/icons";
-import { explorerTx, mon, payoutWei } from "@/lib/contract";
+import { USD_PER_MON, explorerTx, mon, payoutWei, poolWeiForMsrp, usd, usdMon } from "@/lib/contract";
 import { friendlyTxError } from "@/lib/friendly";
 import { useWallet, waitForTx } from "./wallet";
 import { WalletButton } from "./ui";
 
 const { Title, Text, Paragraph } = Typography;
+
+/** Unix expiry `days` from now. Called from the submit handler, never during render. */
+function expiryFromNow(days: number): bigint {
+  return BigInt(Math.floor(Date.now() / 1000) + Math.round(days * 86400));
+}
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -24,31 +29,33 @@ export function SellSection({ onPosted }: { onPosted: () => void }) {
   const { account, createBounty } = useWallet();
   const [item, setItem] = useState("AirPods Pro 2 (USB-C)");
   const [msrp, setMsrp] = useState<number | null>(249);
-  const [sharePct, setSharePct] = useState<number | null>(20);
-  const [escrow, setEscrow] = useState<number | null>(1);
+  const [sharePct, setSharePct] = useState<number | null>(25);
   const [days, setDays] = useState<number | null>(7);
   const [tx, setTx] = useState<string | null>(null);
   const [busy, setBusy] = useState<false | "wallet" | "confirming">(false);
   const [err, setErr] = useState<string | null>(null);
+
+  // The pool is always the reference price converted to MON, so the finder earns share% of the
+  // dollar savings (the contract pays pool × share% × savings ÷ reference price).
+  const msrpCents = msrp && msrp > 0 ? BigInt(Math.round(msrp * 100)) : null;
+  const pool = msrpCents ? poolWeiForMsrp(msrpCents) : null;
 
   async function submit() {
     setErr(null);
     setTx(null);
     try {
       if (!item.trim()) throw new Error("Item name is required.");
-      if (!msrp || msrp <= 0) throw new Error("Reference price must be above $0.");
+      if (!msrpCents || !pool) throw new Error("Reference price must be above $0.");
       if (!sharePct || sharePct < 1 || sharePct > 100) throw new Error("Finder share must be 1–100%.");
-      if (!escrow || escrow <= 0) throw new Error("Add some MON to escrow.");
       if (!days || days <= 0) throw new Error("Expiry must be at least a day.");
-      const refPriceCents = BigInt(Math.round(msrp * 100));
-      const expiry = BigInt(Math.floor(Date.now() / 1000) + Math.round(days * 86400));
+      const expiry = expiryFromNow(days);
       setBusy("wallet");
       const hash = await createBounty({
         item: item.trim(),
-        refPriceCents,
+        refPriceCents: msrpCents,
         sharePct,
         expiry,
-        escrowMon: String(escrow),
+        escrowMon: formatEther(pool),
       });
       setTx(hash);
       setBusy("confirming");
@@ -70,9 +77,9 @@ export function SellSection({ onPosted }: { onPosted: () => void }) {
               Post a bounty
             </Title>
             <Paragraph type="secondary" style={{ margin: "4px 0 0" }}>
-              Escrow MON against the reference price of something you want. The first hunter to verify a
-              lower price earns their share of the savings, and the rest comes back to you. No deal before
-              expiry means a full refund.
+              Lock the reference price of something you want in MON. The first hunter to verify a lower
+              price earns their share of every dollar saved, and the rest of the pool comes back to you. No
+              deal before expiry means a full refund.
             </Paragraph>
           </div>
 
@@ -100,11 +107,8 @@ export function SellSection({ onPosted }: { onPosted: () => void }) {
                   </Field>
                 </Col>
                 <Col xs={24} sm={12}>
-                  <Field label="Escrow">
-                    <Space.Compact style={{ width: "100%" }}>
-                      <InputNumber style={{ width: "100%" }} min={0.001} step={0.1} value={escrow} onChange={setEscrow} />
-                      <Space.Addon>MON</Space.Addon>
-                    </Space.Compact>
+                  <Field label="Pool (reference price in MON)">
+                    <Input value={pool ? mon(pool) : "—"} readOnly aria-readonly="true" />
                   </Field>
                 </Col>
                 <Col xs={24} sm={12}>
@@ -117,7 +121,7 @@ export function SellSection({ onPosted }: { onPosted: () => void }) {
                 </Col>
               </Row>
 
-              <ExamplePayout msrp={msrp} sharePct={sharePct} escrow={escrow} />
+              <ExamplePayout msrpCents={msrpCents} sharePct={sharePct} pool={pool} />
 
               {account ? (
                 <Button type="primary" size="large" block loading={!!busy} onClick={() => void submit()}>
@@ -150,28 +154,23 @@ export function SellSection({ onPosted }: { onPosted: () => void }) {
   );
 }
 
-/** "If a hunter finds it 20% cheaper, they earn X MON and you get Y back." */
+/** "If a hunter finds it for $199.20 ($49.80 saved), they earn $12.45 (0.12 MON)…" */
 function ExamplePayout({
-  msrp,
+  msrpCents,
   sharePct,
-  escrow,
+  pool,
 }: {
-  msrp: number | null;
+  msrpCents: bigint | null;
   sharePct: number | null;
-  escrow: number | null;
+  pool: bigint | null;
 }) {
-  if (!msrp || !sharePct || !escrow || msrp <= 0 || sharePct < 1 || sharePct > 100 || escrow <= 0) return null;
-  try {
-    const ref = BigInt(Math.round(msrp * 100));
-    const esc = parseEther(String(escrow));
-    const paid = payoutWei(esc, sharePct, ref, (ref * BigInt(80)) / BigInt(100));
-    return (
-      <Alert
-        type="info"
-        title={`If a hunter finds it 20% cheaper, they earn ${mon(paid)} and ${mon(esc - paid)} comes back to you.`}
-      />
-    );
-  } catch {
-    return null;
-  }
+  if (!msrpCents || !pool || !sharePct || sharePct < 1 || sharePct > 100) return null;
+  const found = (msrpCents * BigInt(80)) / BigInt(100);
+  const paid = payoutWei(pool, sharePct, msrpCents, found);
+  return (
+    <Alert
+      type="info"
+      title={`If a hunter finds it for ${usd(found)} (${usd(msrpCents - found)} saved), they earn ${usdMon(paid)} and ${mon(pool - paid)} comes back to you. Demo rate: 1 MON = $${USD_PER_MON}.`}
+    />
+  );
 }

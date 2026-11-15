@@ -256,3 +256,39 @@ export function mon(wei: bigint): string {
   if (n >= 1) return `${n.toLocaleString("en-US", { maximumFractionDigits: 3 })} MON`;
   return `${n.toPrecision(2)} MON`;
 }
+
+/**
+ * Demo exchange rate. Testnet MON has no market price, so we fix one.
+ *
+ * Posting a bounty locks the full MSRP in MON at this rate. The contract pays
+ * pool × share% × (savings ÷ MSRP), so a pool worth exactly the MSRP pays the
+ * finder share% of the dollar savings, and everything else refunds to the poster.
+ */
+export const USD_PER_MON = 100;
+
+const WEI_PER_MON = BigInt(10) ** BigInt(18);
+
+/** MON (wei) worth `cents` at the demo rate. */
+export function usdCentsToWei(cents: bigint): bigint {
+  return (cents * WEI_PER_MON) / BigInt(USD_PER_MON * 100);
+}
+
+/** USD cents worth `wei` MON at the demo rate. */
+export function weiToUsdCents(wei: bigint): bigint {
+  return (wei * BigInt(USD_PER_MON * 100)) / WEI_PER_MON;
+}
+
+/** Pool that makes the finder earn exactly share% of the dollar savings. */
+export function poolWeiForMsrp(msrpCents: bigint): bigint {
+  return usdCentsToWei(msrpCents);
+}
+
+/** True when the pool covers the full MSRP. Bounties posted before this change may not. */
+export function isFullPool(escrow: bigint, refPriceCents: bigint): boolean {
+  return escrow >= poolWeiForMsrp(refPriceCents);
+}
+
+/** Dollar value first, MON second, e.g. "$25.00 (0.25 MON)". */
+export function usdMon(wei: bigint): string {
+  return `${usd(weiToUsdCents(wei))} (${mon(wei)})`;
+}
