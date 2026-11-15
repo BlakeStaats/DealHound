@@ -6,6 +6,7 @@ import { Button, Tabs, Typography } from "antd";
 import { CONTRACT_ADDRESS, explorerAddress } from "@/lib/contract";
 import { WalletProvider, useBounties } from "@/components/wallet";
 import { WalletButton, shortAddr } from "@/components/ui";
+import { PriceTicker } from "@/components/PriceTicker";
 import { BuySection } from "@/components/BuySection";
 import { SellSection } from "@/components/SellSection";
 import { NftGallery } from "@/components/NftGallery";
@@ -28,6 +29,7 @@ function Market() {
             <span className={s.brandName}>DealHound</span>
           </button>
           <div className={s.headerRight}>
+            <PriceTicker />
             <Link href="/agents">
               <Button type="text">Bot docs</Button>
             </Link>
