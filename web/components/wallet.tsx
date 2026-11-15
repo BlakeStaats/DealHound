@@ -7,9 +7,10 @@ import {
   type Address,
   type Hex,
 } from "viem";
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import {
   Bounty,
+  BountyStatus,
   CONTRACT_ADDRESS,
   DEAL_BOUNTY_ABI,
   createDealPublicClient,
@@ -145,17 +146,64 @@ export async function readBounties(): Promise<Bounty[]> {
   return readAllBounties();
 }
 
-/** Hook that loads bounties from chain, with a manual refresh. */
+export type Activity = {
+  key: string;
+  kind: "posted" | "filled";
+  bounty: Bounty;
+  at: number | null; // ms timestamp when we saw it happen; null = before this page loaded
+};
+
+const POLL_MS = 4000;
+
+/**
+ * Loads bounties from chain and keeps them fresh (polls every 4s, no loading flash).
+ * Diffs each poll against the last one to build a live activity feed, so claims made by
+ * anyone (humans in other browsers, bots) show up within a few seconds.
+ */
 export function useBounties() {
   const [bounties, setBounties] = useState<Bounty[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activity, setActivity] = useState<Activity[]>([]);
+  const prev = useRef<Map<string, Bounty> | null>(null);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
     try {
-      setBounties(await readBounties());
+      const next = await readBounties();
+      setError(null);
+      setBounties(next);
+
+      const now = Date.now();
+      const events: Activity[] = [];
+      if (prev.current === null) {
+        // First load: seed the feed with history (no timestamps on-chain without logs).
+        for (const b of next) {
+          events.push({ key: `p${b.id}`, kind: "posted", bounty: b, at: null });
+          if (b.status === BountyStatus.Filled) events.push({ key: `f${b.id}`, kind: "filled", bounty: b, at: null });
+        }
+      } else {
+        for (const b of next) {
+          const old = prev.current.get(b.id.toString());
+          if (!old) events.push({ key: `p${b.id}`, kind: "posted", bounty: b, at: now });
+          if (b.status === BountyStatus.Filled && old?.status !== BountyStatus.Filled) {
+            events.push({ key: `f${b.id}`, kind: "filled", bounty: b, at: now });
+          }
+        }
+      }
+      prev.current = new Map(next.map((b) => [b.id.toString(), b]));
+      if (events.length) {
+        setActivity((cur) => {
+          const seen = new Set(cur.map((a) => a.key));
+          const fresh = events.filter((e) => !seen.has(e.key));
+          // Live events: newest bounty first. History (no timestamps): claims first, then posts.
+          const sorted = [...fresh].sort(
+            (a, b) =>
+              (a.at === null && a.kind !== b.kind ? (a.kind === "filled" ? -1 : 1) : 0) ||
+              Number(b.bounty.id - a.bounty.id),
+          );
+          return [...sorted, ...cur].slice(0, 30);
+        });
+      }
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -165,7 +213,16 @@ export function useBounties() {
 
   useEffect(() => {
     void refresh();
+    const t = setInterval(() => void refresh(), POLL_MS);
+    return () => clearInterval(t);
   }, [refresh]);
 
-  return { bounties, loading, error, refresh };
+  return { bounties, loading, error, refresh, activity };
+}
+
+/** Waits for a tx to be mined; throws if it reverted. */
+export async function waitForTx(hash: Hex) {
+  const receipt = await publicClient.waitForTransactionReceipt({ hash });
+  if (receipt.status !== "success") throw new Error("Transaction reverted on-chain.");
+  return receipt;
 }

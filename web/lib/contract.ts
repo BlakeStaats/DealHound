@@ -242,3 +242,17 @@ export function finderEarnedUsd(msrpCents: bigint, foundCents: bigint, sharePct:
   const earnedCents = (Number(savingsCents(msrpCents, foundCents)) * sharePct) / 100;
   return usd(earnedCents);
 }
+
+/** MON (wei) the finder is paid. Same integer math as DealBounty.submitDeal. */
+export function payoutWei(escrow: bigint, sharePct: number, refPriceCents: bigint, foundCents: bigint): bigint {
+  if (foundCents >= refPriceCents || refPriceCents === BigInt(0)) return BigInt(0);
+  return (escrow * BigInt(sharePct) * (refPriceCents - foundCents)) / (BigInt(100) * refPriceCents);
+}
+
+/** Short MON amount for display, e.g. 0.0048 MON. */
+export function mon(wei: bigint): string {
+  const n = Number(wei) / 1e18;
+  if (n === 0) return "0 MON";
+  if (n >= 1) return `${n.toLocaleString("en-US", { maximumFractionDigits: 3 })} MON`;
+  return `${n.toPrecision(2)} MON`;
+}

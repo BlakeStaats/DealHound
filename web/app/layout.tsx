@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MonadFLIP",
-  description: "Deal bounties on Monad",
+  title: "DealHound · deal bounties on Monad",
+  description: "Post a price. Humans and AI agents race to beat it. Pay only for the savings.",
 };
 
 export default function RootLayout({

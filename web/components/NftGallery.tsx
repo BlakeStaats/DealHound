@@ -1,15 +1,14 @@
 "use client";
 
-import { formatEther } from "viem";
 import {
   Bounty,
   BountyStatus,
   discountPct,
-  finderEarnedUsd,
   savingsCents,
   usd,
 } from "@/lib/contract";
-import { DiscountBadge, shortAddr } from "./ui";
+import { DiscountBadge, HunterBadge, ProductTile } from "./ui";
+import { mon } from "@/lib/contract";
 import s from "@/app/market.module.css";
 
 export function NftGallery({ bounties }: { bounties: Bounty[] }) {
@@ -44,6 +43,7 @@ function NftCard({ bounty: b }: { bounty: Bounty }) {
   return (
     <article className={s.nft}>
       <div className={s.nftArt}>
+        <ProductTile item={b.item} size={72} />
         <DiscountBadge pct={pct} size="lg" />
         <div className={s.nftTokenId}>Deal Proof #{b.id.toString()}</div>
       </div>
@@ -54,23 +54,28 @@ function NftCard({ bounty: b }: { bounty: Bounty }) {
           <span className={s.foundPrice}>{usd(b.foundPriceCents)}</span>
         </div>
         <div className={s.savingsLine}>
-          Saved {usd(saved)} · Finder earned {finderEarnedUsd(b.refPriceCents, b.foundPriceCents, b.sharePct)}{" "}
-          <span className={s.shareTag}>{b.sharePct}% share</span>
+          Buyer saved {usd(saved)} <span className={s.shareTag}>{b.sharePct}% share</span>
         </div>
-        <div className={s.nftPayout}>Payout: {formatEther(b.payout)} MON → {shortAddr(b.finder)}</div>
+        <div className={s.nftPayout}>
+          <HunterBadge addr={b.finder} /> earned {mon(b.payout)}
+        </div>
       </div>
     </article>
   );
 }
 
 function Leaderboard({ bounties }: { bounties: Bounty[] }) {
-  const byFinder = new Map<string, { earnedCents: number; deals: number }>();
+  // Ranked by MON actually paid out by the contract.
+  const byFinder = new Map<string, { earned: bigint; savedCents: bigint; deals: number }>();
   for (const b of bounties) {
-    const cents = (Number(savingsCents(b.refPriceCents, b.foundPriceCents)) * b.sharePct) / 100;
-    const cur = byFinder.get(b.finder) ?? { earnedCents: 0, deals: 0 };
-    byFinder.set(b.finder, { earnedCents: cur.earnedCents + cents, deals: cur.deals + 1 });
+    const cur = byFinder.get(b.finder) ?? { earned: BigInt(0), savedCents: BigInt(0), deals: 0 };
+    byFinder.set(b.finder, {
+      earned: cur.earned + b.payout,
+      savedCents: cur.savedCents + savingsCents(b.refPriceCents, b.foundPriceCents),
+      deals: cur.deals + 1,
+    });
   }
-  const rows = [...byFinder.entries()].sort((a, c) => c[1].earnedCents - a[1].earnedCents);
+  const rows = [...byFinder.entries()].sort((a, c) => (c[1].earned > a[1].earned ? 1 : -1));
 
   return (
     <div className={s.leaderboard}>
@@ -78,9 +83,9 @@ function Leaderboard({ bounties }: { bounties: Bounty[] }) {
       <ol>
         {rows.map(([addr, v]) => (
           <li key={addr}>
-            <span>{shortAddr(addr)}</span>
+            <HunterBadge addr={addr} />
             <span className={s.lbEarned}>
-              {usd(v.earnedCents)} · {v.deals} deal{v.deals === 1 ? "" : "s"}
+              {mon(v.earned)} · saved buyers {usd(v.savedCents)} · {v.deals} deal{v.deals === 1 ? "" : "s"}
             </span>
           </li>
         ))}

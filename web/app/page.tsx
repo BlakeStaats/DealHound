@@ -58,7 +58,7 @@ function Market() {
           </nav>
 
           <main className={s.main}>
-            {tab === "hunt" && <BuySection bountiesHook={bountiesHook} />}
+            {tab === "hunt" && <BuySection bountiesHook={bountiesHook} onViewProofs={() => setTab("nfts")} />}
             {tab === "post" && (
               <SellSection
                 onPosted={() => {

@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { explorerTx } from "@/lib/contract";
-import { useWallet } from "./wallet";
+import { explorerTx, mon, payoutWei } from "@/lib/contract";
+import { friendlyTxError } from "@/lib/friendly";
+import { parseEther } from "viem";
+import { useWallet, waitForTx } from "./wallet";
 import { WalletButton } from "./ui";
 import s from "@/app/market.module.css";
 
@@ -11,10 +13,10 @@ export function SellSection({ onPosted }: { onPosted: () => void }) {
   const [item, setItem] = useState("AirPods Pro 2 (USB-C)");
   const [msrp, setMsrp] = useState("249.00");
   const [sharePct, setSharePct] = useState("20");
-  const [escrow, setEscrow] = useState("0.1");
+  const [escrow, setEscrow] = useState("1");
   const [days, setDays] = useState("7");
   const [tx, setTx] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<false | "wallet" | "confirming">(false);
   const [err, setErr] = useState<string | null>(null);
 
   async function submit() {
@@ -28,12 +30,14 @@ export function SellSection({ onPosted }: { onPosted: () => void }) {
       if (!(pct >= 1 && pct <= 100)) throw new Error("Finder share must be 1–100%");
       const expiry = BigInt(Math.floor(Date.now() / 1000) + Number(days) * 86400);
 
-      setBusy(true);
+      setBusy("wallet");
       const hash = await createBounty({ item: item.trim(), refPriceCents, sharePct: pct, expiry, escrowMon: escrow });
       setTx(hash);
+      setBusy("confirming");
+      await waitForTx(hash);
       onPosted();
     } catch (e) {
-      setErr((e as Error).message);
+      setErr(friendlyTxError(e));
     } finally {
       setBusy(false);
     }
@@ -77,9 +81,11 @@ export function SellSection({ onPosted }: { onPosted: () => void }) {
           </label>
         </div>
 
+        <ExamplePayout msrp={msrp} sharePct={sharePct} escrow={escrow} />
+
         {account ? (
-          <button className={s.primaryBtn} onClick={submit} disabled={busy}>
-            {busy ? "Posting…" : "Post bounty"}
+          <button className={s.primaryBtn} onClick={submit} disabled={!!busy}>
+            {busy === "wallet" ? "Confirm in your wallet…" : busy === "confirming" ? "Posting on Monad…" : "Post bounty"}
           </button>
         ) : (
           <WalletButton />
@@ -97,4 +103,23 @@ export function SellSection({ onPosted }: { onPosted: () => void }) {
       </div>
     </section>
   );
+}
+
+/** "If a hunter finds it 20% cheaper, they earn X MON and you get Y back." */
+function ExamplePayout({ msrp, sharePct, escrow }: { msrp: string; sharePct: string; escrow: string }) {
+  try {
+    const ref = BigInt(Math.round(parseFloat(msrp) * 100));
+    const pct = Number(sharePct);
+    const esc = parseEther(escrow);
+    if (!(ref > BigInt(0)) || !(pct >= 1 && pct <= 100) || !(esc > BigInt(0))) return null;
+    const found = (ref * BigInt(80)) / BigInt(100);
+    const paid = payoutWei(esc, pct, ref, found);
+    return (
+      <p className={s.muted}>
+        Example: if a hunter finds it 20% cheaper, they earn {mon(paid)} and {mon(esc - paid)} comes back to you.
+      </p>
+    );
+  } catch {
+    return null;
+  }
 }
