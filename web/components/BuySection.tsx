@@ -26,7 +26,6 @@ import {
   USD_PER_MON,
   discountPct,
   explorerTx,
-  isFullPool,
   mon,
   payoutWei,
   savingsCents,
@@ -181,11 +180,7 @@ function BountyCard({ bounty: b, onHunt }: { bounty: Bounty; onHunt: () => void 
         <Statistic title="Reward pool" value={mon(b.escrow)} styles={{ content: { fontSize: 16 } }} />
         <Statistic
           title="Finder gets"
-          value={
-            isFullPool(b.escrow, b.refPriceCents)
-              ? `${b.sharePct}% of savings`
-              : `up to ${usd(weiToUsdCents(payoutWei(b.escrow, b.sharePct, b.refPriceCents, BigInt(0))))}`
-          }
+          value={`${b.sharePct}% of savings`}
           styles={{ content: { fontSize: 16 } }}
         />
       </Flex>
@@ -346,19 +341,9 @@ function HuntDrawer({
           type="info"
           title={
             <>
-              Find it for less than <strong>{usd(bounty.refPriceCents)}</strong>.{" "}
-              {isFullPool(bounty.escrow, bounty.refPriceCents) ? (
-                <>
-                  You earn <strong>{bounty.sharePct}% of every dollar you save</strong>, paid in MON from a{" "}
-                  {mon(bounty.escrow)} pool (demo rate: 1 MON = ${USD_PER_MON}).
-                </>
-              ) : (
-                <>
-                  This bounty&apos;s pool is smaller than its reference price, so you earn less: up to{" "}
-                  <strong>{usdMon(payoutWei(bounty.escrow, bounty.sharePct, bounty.refPriceCents, BigInt(0)))}</strong>,
-                  more the bigger the discount.
-                </>
-              )}
+              Find it for less than <strong>{usd(bounty.refPriceCents)}</strong>. You earn{" "}
+              <strong>{bounty.sharePct}% of every dollar you save</strong>, paid in MON from a {mon(bounty.escrow)}{" "}
+              pool (demo rate: 1 MON = ${USD_PER_MON}).
             </>
           }
         />
