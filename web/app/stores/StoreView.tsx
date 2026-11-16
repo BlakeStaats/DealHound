@@ -63,12 +63,13 @@ export default function StoreView({ store, product }: { store: Store; product: P
       <div className={s.crumbs}>Home › {product.breadcrumb}</div>
 
       <main className={s.main}>
-        <div className={s.image} aria-label="Product image placeholder">
-          <svg viewBox="0 0 120 120" width="42%" aria-hidden="true">
-            <rect x="10" y="22" width="100" height="76" rx="10" fill="none" stroke="#c4c8d0" strokeWidth="4" />
-            <circle cx="42" cy="50" r="9" fill="#c4c8d0" />
-            <path d="M18 90 L48 62 L66 78 L82 64 L104 90 Z" fill="#c4c8d0" />
-          </svg>
+        <div className={s.image}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={product.image}
+            alt={product.name}
+            style={{ maxWidth: "80%", maxHeight: "90%", objectFit: "contain" }}
+          />
         </div>
 
         <section className={s.info}>
