@@ -25,6 +25,10 @@ export type Product = {
   brand: string;
   description: string;
   breadcrumb: string;
+  /** product photo in /public/products */
+  image: string;
+  /** lowercase keywords to match a free-text bounty item to this product */
+  keywords: string[];
   /** price per store slug; listPrice is the struck-through "was" price */
   prices: Record<string, { price: number; listPrice?: number }>;
 };
@@ -82,6 +86,8 @@ export const PRODUCTS: Product[] = [
     description:
       "Active Noise Cancellation, Adaptive Audio, Transparency mode, Personalized Spatial Audio, and a MagSafe charging case with USB-C.",
     breadcrumb: "Audio › Headphones › Wireless Earbuds",
+    image: "/products/airpods-pro-2.jpg",
+    keywords: ["airpod", "earbud", "earphone"],
     prices: {
       voltmart: { price: 229.0, listPrice: 249.0 },
       redline: { price: 209.0, listPrice: 249.0 },
@@ -95,6 +101,8 @@ export const PRODUCTS: Product[] = [
     description:
       "The original high-top silhouette in premium leather with an encapsulated Air unit and the classic Wings logo.",
     breadcrumb: "Shoes › Men's Sneakers › Basketball",
+    image: "/products/air-jordan-1.jpg",
+    keywords: ["jordan", "air jordan", "nike", "sneaker"],
     prices: {
       voltmart: { price: 189.0, listPrice: 180.0 },
       redline: { price: 172.0, listPrice: 180.0 },
@@ -108,6 +116,8 @@ export const PRODUCTS: Product[] = [
     description:
       "Laser dust detection, piezo particle sensor with on-screen counts, and up to 60 minutes of fade-free runtime.",
     breadcrumb: "Appliances › Floor Care › Cordless Vacuums",
+    image: "/products/dyson-v15.jpg",
+    keywords: ["dyson", "vacuum"],
     prices: {
       voltmart: { price: 749.99, listPrice: 749.99 },
       redline: { price: 699.0, listPrice: 749.99 },
@@ -121,6 +131,8 @@ export const PRODUCTS: Product[] = [
     description:
       "1TB SSD, ultra-high-speed loading, haptic feedback and adaptive triggers on the DualSense controller.",
     breadcrumb: "Gaming › Consoles › PlayStation",
+    image: "/products/ps5-slim.png",
+    keywords: ["ps5", "playstation", "ps 5"],
     prices: {
       voltmart: { price: 499.99, listPrice: 499.99 },
       redline: { price: 474.0, listPrice: 499.99 },
@@ -141,4 +153,13 @@ export function getProduct(id: string): Product | undefined {
 
 export function storePath(storeSlug: string, productId: string): string {
   return `/stores/${storeSlug}/${productId}`;
+}
+
+/** Best product photo for a free-text bounty item, or null if nothing matches. */
+export function productImageForItem(item: string): string | null {
+  const t = item.toLowerCase();
+  for (const p of PRODUCTS) {
+    if (p.keywords.some((k) => t.includes(k))) return p.image;
+  }
+  return null;
 }

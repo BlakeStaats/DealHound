@@ -16,6 +16,7 @@ import {
 import { useWallet } from "./wallet";
 import { QuoteError } from "@/lib/friendly";
 import { classifyCategory } from "@/lib/categories";
+import { productImageForItem } from "@/lib/stores";
 
 export function shortAddr(a?: string): string {
   return a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "";
@@ -97,12 +98,20 @@ export function CategoryIcon({ id }: { id: string }) {
 
 export function ProductTile({ item, size = 48 }: { item: string; size?: number }) {
   const cat = classifyCategory(item);
+  const img = productImageForItem(item);
   return (
     <Avatar
       shape="square"
       size={size}
+      src={img ?? undefined}
+      // Falls back to the category icon if there's no photo or it fails to load.
       icon={<CategoryIcon id={cat.id} />}
-      style={{ background: "#eef0f4", color: "#5b6270", flex: "none" }}
+      style={{
+        background: img ? "#fff" : "#eef0f4",
+        color: "#5b6270",
+        border: "1px solid #eef0f4",
+        flex: "none",
+      }}
     />
   );
 }
